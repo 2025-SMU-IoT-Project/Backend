@@ -83,4 +83,10 @@ public class LaserController {
         InsertionStatsResponseDTO stats = laserService.getInsertionStats(binId);
         return ApiResponse.onSuccess(LaserSuccessCode.STATS_RETRIEVED, stats.getRecentEvents());
     }
+
+    @GetMapping("/event/uuid/{uuid}")
+    public EventDetailResponseDTO getEventByUuid(
+        @PathVariable String uuid) {
+        return laserService.getEventDetailByUuid(uuid);
+    }
 }
