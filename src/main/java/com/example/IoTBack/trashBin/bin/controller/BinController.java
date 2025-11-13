@@ -1,6 +1,6 @@
 package com.example.IoTBack.trashBin.bin.controller;
 
-import com.example.IoTBack.global.apiPayload.BaseResponse;
+import com.example.IoTBack.global.apiPayload.ApiResponse;
 import com.example.IoTBack.trashBin.bin.converter.BinConverter;
 import com.example.IoTBack.trashBin.bin.domain.Bin;
 import com.example.IoTBack.trashBin.bin.dto.request.BinRequestDTO;
@@ -16,14 +16,14 @@ public class BinController {
     private final BinService binService;
 
     @PostMapping
-    public BaseResponse<BinResponseDTO.CreateBinResultDTO> createBin(@RequestBody BinRequestDTO.CreateBinDTO createBinDTO) {
+    public ApiResponse<BinResponseDTO.CreateBinResultDTO> createBin(@RequestBody BinRequestDTO.CreateBinDTO createBinDTO) {
         Bin bin = binService.createBin(createBinDTO);
-        return BaseResponse.onSuccess(BinConverter.tocreateBinResultDTO(bin));
+        return ApiResponse.onSuccess(BinConverter.tocreateBinResultDTO(bin));
     }
 
     @GetMapping("/{binId}")
-    public BaseResponse<BinResponseDTO.BinPreviewDTO> readBin(Long binId) {
+    public ApiResponse<BinResponseDTO.BinPreviewDTO> readBin(Long binId) {
         Bin bin = binService.readBin(binId);
-        return BaseResponse.onSuccess(BinConverter.toBinPreviewDTO(bin));
+        return ApiResponse.onSuccess(BinConverter.toBinPreviewDTO(bin));
     }
 }
