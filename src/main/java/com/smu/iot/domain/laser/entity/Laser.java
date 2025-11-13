@@ -1,13 +1,11 @@
 package com.smu.iot.domain.laser.entity;
 
+import com.smu.iot.global.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.hibernate.annotations.CreationTimestamp;
-
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "laser")
@@ -15,19 +13,15 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Laser {
+public class Laser extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @CreationTimestamp
-    @Column(name = "reg_date", nullable = false, updatable = false)
-    private LocalDateTime regDate;
-
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "event_id", nullable = false)
-    private InsertionEvent insertionEvent;
+    private CupShape cupShape;
 
     @Column(name = "time_ms", nullable = false)
     private Integer timeMsec;  // 측정 시간
