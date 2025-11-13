@@ -1,11 +1,20 @@
+*.yml
+*.properties
+
+!workflow.yml
+
+*.pem
+*.env
+
 HELP.md
 .gradle
 build/
 !gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
 !**/src/main/**/build/
 !**/src/test/**/build/
+*.DS_Store
 
-### STS ###
 .apt_generated
 .classpath
 .factorypath
@@ -17,7 +26,6 @@ bin/
 !**/src/main/**/bin/
 !**/src/test/**/bin/
 
-### IntelliJ IDEA ###
 .idea
 *.iws
 *.iml
@@ -26,15 +34,11 @@ out/
 !**/src/main/**/out/
 !**/src/test/**/out/
 
-### NetBeans ###
 /nbproject/private/
 /nbbuild/
 /dist/
 /nbdist/
 /.nb-gradle/
 
-### VS Code ###
 .vscode/
-
-### env or yml
-*.yml
+app.log
