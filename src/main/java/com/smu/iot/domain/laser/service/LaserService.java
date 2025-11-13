@@ -5,8 +5,8 @@ import com.smu.iot.domain.laser.dto.request.InsertionEventRequestDTO;
 import com.smu.iot.domain.laser.dto.response.EventDetailResponseDTO;
 import com.smu.iot.domain.laser.dto.response.InsertionEventResponseDTO;
 import com.smu.iot.domain.laser.dto.response.InsertionStatsResponseDTO;
-import com.smu.iot.domain.laser.entity.InsertionEvent;
-import com.smu.iot.domain.laser.entity.InsertionEvent.PatternType;
+import com.smu.iot.domain.laser.entity.CupShape;
+import com.smu.iot.domain.laser.entity.CupShape.PatternType;
 import com.smu.iot.domain.laser.entity.Laser;
 import com.smu.iot.domain.laser.repository.InsertionEventRepository;
 import com.smu.iot.global.apipayload.exception.GeneralException;
@@ -59,7 +59,7 @@ public class LaserService {
                 analysisResult.getPatternType(), analysisResult.isValid());
 
             // 4. 이벤트 엔티티 생성
-            InsertionEvent event = createInsertionEvent(request, analysisResult);
+            CupShape event = createInsertionEvent(request, analysisResult);
 
             // 5. 측정값 엔티티 생성 및 연결
             for (int i = 0; i < request.getSamples().size(); i++) {
@@ -73,7 +73,7 @@ public class LaserService {
             }
 
             // 6. DB 저장
-            InsertionEvent savedEvent = eventRepository.save(event);
+            CupShape savedEvent = eventRepository.save(event);
             log.info("Event saved: id={}, valid={}", savedEvent.getId(), savedEvent.getIsValidCup());
 
             // 7. 응답 생성
@@ -213,11 +213,12 @@ public class LaserService {
     }
 
     // 이벤트 엔티티 생성
-    private InsertionEvent createInsertionEvent(
+    private CupShape createInsertionEvent(
         InsertionEventRequestDTO request,
         PatternAnalysisResult analysisResult) {
 
-        return InsertionEvent.builder()
+        return CupShape.builder()
+            .uuid(request.getUuid())
             .binId(request.getBinId() != null ? request.getBinId() : 1L)
             .binWidthMm(request.getBinWidthMm())
             .isValidCup(analysisResult.isValid())
@@ -231,7 +232,7 @@ public class LaserService {
     }
 
     private InsertionEventResponseDTO buildResponse(
-        InsertionEvent event) {
+        CupShape event) {
 
         // 그래프용 지름 데이터 생성
         List<InsertionEventResponseDTO.DiameterData> diameterData = new ArrayList<>();
@@ -261,32 +262,19 @@ public class LaserService {
     // 이벤트 상세 조회
     @Transactional(readOnly = true)
     public EventDetailResponseDTO getEventDetail(Long eventId) {
-        InsertionEvent event = eventRepository.findById(eventId)
+        CupShape event = eventRepository.findById(eventId)
             .orElseThrow(() -> new GeneralException(LaserErrorCode.EVENT_NOT_FOUND));
 
-        List<EventDetailResponseDTO.MeasurementDetail> measurements = event.getMeasurements().stream()
-            .map(m -> EventDetailResponseDTO.MeasurementDetail.builder()
-                .measurementId(m.getId())
-                .timeMsec(m.getTimeMsec())
-                .distanceMm(m.getDistanceMm())
-                .diameterMm(m.getDiameterMm())
-                .regDate(m.getRegDate())
-                .build())
-            .collect(Collectors.toList());
+        // 헬퍼 메서드 사용하도록 변경
+        return mapToEventDetailDTO(event);
+    }
 
-        return EventDetailResponseDTO.builder()
-            .eventId(event.getId())
-            .regDate(event.getRegDate())
-            .binId(event.getBinId())
-            .isValidCup(event.getIsValidCup())
-            .patternType(event.getPatternType().name())
-            .minDiameterMm(event.getMinDiameterMm())
-            .maxDiameterMm(event.getMaxDiameterMm())
-            .diameterChangeMm(event.getDiameterChangeMm())
-            .rejectionReason(event.getRejectionReason())
-            .sampleCount(event.getSampleCount())
-            .measurements(measurements)
-            .build();
+    @Transactional(readOnly = true)
+    public EventDetailResponseDTO getEventDetailByUuid(String uuid) {
+        CupShape event = eventRepository.findByUuid(uuid)
+            .orElseThrow(() -> new GeneralException(LaserErrorCode.EVENT_NOT_FOUND));
+
+        return mapToEventDetailDTO(event);
     }
 
     // 통계 조회
@@ -309,7 +297,7 @@ public class LaserService {
             .build();
 
         // 최근 10개 이벤트
-        List<InsertionEvent> recentEvents = eventRepository.findTop10ByBinIdOrderByRegDateDesc(binId);
+        List<CupShape> recentEvents = eventRepository.findTop10ByBinIdOrderByRegDateDesc(binId);
         List<InsertionStatsResponseDTO.RecentEvent> recentEventDTOs = recentEvents.stream()
             .map(e -> InsertionStatsResponseDTO.RecentEvent.builder()
                 .eventId(e.getId())
@@ -341,5 +329,31 @@ public class LaserService {
         private double minDiameter;
         private double maxDiameter;
         private double diameterChange;
+    }
+
+    private EventDetailResponseDTO mapToEventDetailDTO(CupShape event) {
+        List<EventDetailResponseDTO.MeasurementDetail> measurements = event.getMeasurements().stream()
+            .map(m -> EventDetailResponseDTO.MeasurementDetail.builder()
+                .measurementId(m.getId())
+                .timeMsec(m.getTimeMsec())
+                .distanceMm(m.getDistanceMm())
+                .diameterMm(m.getDiameterMm())
+                .regDate(m.getCreatedAt())
+                .build())
+            .collect(Collectors.toList());
+
+        return EventDetailResponseDTO.builder()
+            .eventId(event.getId())
+            .regDate(event.getRegDate())
+            .binId(event.getBinId())
+            .isValidCup(event.getIsValidCup())
+            .patternType(event.getPatternType().name())
+            .minDiameterMm(event.getMinDiameterMm())
+            .maxDiameterMm(event.getMaxDiameterMm())
+            .diameterChangeMm(event.getDiameterChangeMm())
+            .rejectionReason(event.getRejectionReason())
+            .sampleCount(event.getSampleCount())
+            .measurements(measurements)
+            .build();
     }
 }
