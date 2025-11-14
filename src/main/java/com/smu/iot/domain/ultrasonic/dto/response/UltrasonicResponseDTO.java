@@ -5,6 +5,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -14,4 +16,5 @@ public class UltrasonicResponseDTO {
     private String uuid;
     private Double distanceCm;
     private Double fillRate;
+    private LocalDateTime createdAt;
 }
