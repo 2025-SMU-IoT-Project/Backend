@@ -9,16 +9,19 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "insertion_event")
+@Table(name = "cup_shape")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class InsertionEvent {
+public class CupShape {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(nullable = false, length = 36)
+    private String uuid; // 이벤트 고유 ID
 
     @CreationTimestamp
     @Column(name = "reg_date", nullable = false, updatable = false)
@@ -52,13 +55,13 @@ public class InsertionEvent {
     @Column(name = "sample_count")
     private Integer sampleCount;  // 측정 샘플 수
 
-    @OneToMany(mappedBy = "insertionEvent", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "cupShape", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<Laser> measurements = new ArrayList<>();
 
     public void addMeasurement(Laser measurement) {
         measurements.add(measurement);
-        measurement.setInsertionEvent(this);
+        measurement.setCupShape(this);
     }
 
     @Getter

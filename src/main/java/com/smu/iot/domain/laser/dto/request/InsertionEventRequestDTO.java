@@ -15,6 +15,7 @@ import java.util.List;
 @Builder
 public class InsertionEventRequestDTO {
 
+    private String uuid;
     private Long binId;
     private Double binWidthMm;
     private List<SampleData> samples;
