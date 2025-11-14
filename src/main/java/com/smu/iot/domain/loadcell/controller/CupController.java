@@ -39,7 +39,7 @@ public class CupController {
         return ApiResponse.onSuccess(CupSuccessCode.WEIGHT_DATA_SAVED, response);
     }
 
-    @GetMapping("/{binId}/history")
+    @GetMapping("/history/{binId}")
     @Operation(
         summary = "무게 측정 이력 조회",
         description = "특정 쓰레기통의 최근 무게 측정 이력을 조회"
