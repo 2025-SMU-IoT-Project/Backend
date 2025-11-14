@@ -24,5 +24,5 @@ public class BaseEntity {
     protected LocalDateTime updatedAt;
 
     @Column(name = "is_activated")
-    private Boolean isActivated;
+    private Boolean isActivated = true;
 }
