@@ -1,5 +1,7 @@
 package com.smu.iot.domain.loadcell.service;
 
+import com.smu.iot.domain.event.entity.Event;
+import com.smu.iot.domain.event.repository.EventRepository;
 import com.smu.iot.domain.loadcell.code.CupErrorCode;
 import com.smu.iot.domain.loadcell.dto.request.CupRequestDTO;
 import com.smu.iot.domain.loadcell.dto.response.CupHistoryDTO;
@@ -25,6 +27,7 @@ import java.util.stream.Collectors;
 public class CupService {
 
     private final CupRepository cupRepository;
+    private final EventRepository eventRepository;
 
     // 기본 설정값
     private static final double DEFAULT_BASE_WEIGHT = 5.5;        // 빈 컵 기준 무게 (g)
@@ -79,7 +82,24 @@ public class CupService {
             saved.getId(), saved.getBinId(), saved.getUuid(), saved.getWeight(),
             saved.getIsLiquid(), saved.getCupType());
 
+        updateMainEvent(request.getUuid(), saved);
+
         return convertToResponseDTO(saved);
+    }
+
+    private void updateMainEvent(String uuid, Cup cupData) {
+        eventRepository.findByUuid(uuid).ifPresent(event -> {
+            event.linkCupData(cupData);
+            event.setStatus(Event.EventStatus.WEIGHT_MEASURING);
+
+            // 액체 정보 업데이트
+            if (cupData.getIsLiquid() != null) {
+                event.setHasLiquid(cupData.getIsLiquid());
+            }
+
+            eventRepository.save(event);
+            log.info("Main Event updated with Cup data - UUID: {}, EventId: {}", uuid, event.getId());
+        });
     }
 
     public List<CupHistoryDTO> getWeightHistory(Long binId, int limit) {

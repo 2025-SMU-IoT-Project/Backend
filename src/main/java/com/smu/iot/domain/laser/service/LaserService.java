@@ -1,5 +1,7 @@
 package com.smu.iot.domain.laser.service;
 
+import com.smu.iot.domain.event.entity.Event;
+import com.smu.iot.domain.event.repository.EventRepository;
 import com.smu.iot.domain.laser.code.LaserErrorCode;
 import com.smu.iot.domain.laser.dto.request.InsertionEventRequestDTO;
 import com.smu.iot.domain.laser.dto.response.EventDetailResponseDTO;
@@ -27,6 +29,7 @@ import java.util.stream.Collectors;
 public class LaserService {
 
     private final InsertionEventRepository eventRepository;
+    private final EventRepository mainEventRepository;
 
     // 유효성 검증 상수
     private static final int MIN_SAMPLE_COUNT = 10;  // 최소 샘플 수
@@ -39,7 +42,8 @@ public class LaserService {
 
     // 메인 처리 로직: STM32에서 받은 투입 이벤트 데이터 처리
     public InsertionEventResponseDTO processInsertionEvent(InsertionEventRequestDTO request) {
-        log.info("Processing insertion event - binId: {}, samples: {}",
+        log.info("Processing insertion event - UUID: {}, binId: {}, samples: {}",
+            request.getUuid(),
             request.getBinId(),
             request.getSamples() != null ? request.getSamples().size() : 0);
 
@@ -74,9 +78,11 @@ public class LaserService {
 
             // 6. DB 저장
             CupShape savedEvent = eventRepository.save(event);
-            log.info("Event saved: id={}, valid={}", savedEvent.getId(), savedEvent.getIsValidCup());
 
-            // 7. 응답 생성
+            // 7. Event 업데이트
+            updateMainEvent(request.getUuid(), savedEvent);
+
+            // 8. 응답 생성
             return buildResponse(savedEvent);
 
         } catch (GeneralException e) {
@@ -85,6 +91,21 @@ public class LaserService {
             log.error("Error processing insertion event", e);
             throw new GeneralException(LaserErrorCode.PROCESSING_FAILED);
         }
+    }
+
+    private void updateMainEvent(String uuid, CupShape laserData) {
+        mainEventRepository.findByUuid(uuid).ifPresent(event -> {
+            event.linkLaserData(laserData);
+            event.setStatus(Event.EventStatus.LASER_PROCESSING);
+
+            // 유효성 정보 업데이트
+            if (laserData.getIsValidCup() != null) {
+                event.setIsValidInput(laserData.getIsValidCup());
+            }
+
+            mainEventRepository.save(event);
+            log.info("Main Event updated with Laser data - UUID: {}, EventId: {}", uuid, event.getId());
+        });
     }
 
     // 입력 데이터 검증
@@ -265,7 +286,6 @@ public class LaserService {
         CupShape event = eventRepository.findById(eventId)
             .orElseThrow(() -> new GeneralException(LaserErrorCode.EVENT_NOT_FOUND));
 
-        // 헬퍼 메서드 사용하도록 변경
         return mapToEventDetailDTO(event);
     }
 
