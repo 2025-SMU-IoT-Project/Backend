@@ -5,7 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "load_cell")
+@Table(name = "cup")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -42,7 +42,7 @@ public class Cup extends BaseEntity {
     @Column(name = "liquid_weight")
     private Double liquidWeight;  // 액체 무게 (실제 무게 - 기준 무게)
 
-    // 임계값 정보
+    // 임계값 정보(?)
     @Column(name = "weight_threshold")
     private Double weightThreshold;  // 무게 감지 임계값
 
@@ -80,17 +80,5 @@ public class Cup extends BaseEntity {
             }
             return ABNORMAL;
         }
-    }
-
-    // 액체 무게 계산
-    public void calculateLiquidWeight() {
-        if (this.baseWeight != null && this.weight != null) {
-            this.liquidWeight = this.weight - this.baseWeight;
-        }
-    }
-
-    // 컵 타입 자동 설정
-    public void determineCupType() {
-        this.cupType = CupWeightType.fromWeight(this.weight);
     }
 }

@@ -14,10 +14,9 @@ public class CupStatsDTO {
     private Integer emptyCups;
     private Integer liquidCups;
     private Double liquidRate;           // 액체 포함 비율 (%)
-    private Double avgEmptyWeight;       // 평균 빈 컵 무게
+    private Double totalLiquidWeight;    // 총 액체 무게
     private Double avgLiquidWeight;      // 평균 액체 포함 무게
     private Double heaviestCup;          // 최대 무게
-    private Double lightestCup;          // 최소 무게
 
     // 무게 범위별 통계
     private WeightRangeStats weightRangeStats;
@@ -31,5 +30,6 @@ public class CupStatsDTO {
         private Integer lightLiquidCount;   // 20-100g
         private Integer mediumLiquidCount;  // 100-200g
         private Integer heavyLiquidCount;   // 200-350g
+        private Integer abnormalCount;      // 이외 무게
     }
 }

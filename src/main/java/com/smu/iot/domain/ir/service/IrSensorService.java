@@ -93,6 +93,7 @@ public class IrSensorService {
 
         // 투입 기록 생성
         CupInputRecord record = CupInputRecord.builder()
+            .uuid(event.getUuid())
             .binId(event.getBinId())
             .cupType(cupType)
             .status(status)

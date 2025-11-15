@@ -1,111 +1,217 @@
 package com.smu.iot.domain.loadcell.service;
 
+import com.smu.iot.domain.loadcell.code.CupErrorCode;
 import com.smu.iot.domain.loadcell.dto.request.CupRequestDTO;
 import com.smu.iot.domain.loadcell.dto.response.CupHistoryDTO;
 import com.smu.iot.domain.loadcell.dto.response.CupResponseDTO;
 import com.smu.iot.domain.loadcell.dto.response.CupStatsDTO;
+import com.smu.iot.domain.loadcell.entity.Cup;
+import com.smu.iot.domain.loadcell.entity.Cup.CupWeightType;
+import com.smu.iot.domain.loadcell.repository.CupRepository;
+import com.smu.iot.global.apipayload.exception.GeneralException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
-import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
+@Transactional(readOnly = true)
 public class CupService {
 
-    // Mock: 무게 데이터 처리
-    public CupResponseDTO processWeightData(CupRequestDTO request) {
-        String uuid = UUID.randomUUID().toString();
-        String cupType = determineCupType(request.getWeight(), request.getIsliquid());
-        Double liquidWeight = request.getIsliquid() ? request.getWeight() - 5.5 : 0.0;
+    private final CupRepository cupRepository;
 
-        return CupResponseDTO.builder()
-            .recordId(System.currentTimeMillis())
-            .uuid(uuid)
-            .binId(1L)
+    // 기본 설정값
+    private static final double DEFAULT_BASE_WEIGHT = 5.5;        // 빈 컵 기준 무게 (g)
+    private static final double DEFAULT_WEIGHT_THRESHOLD = 1.0;   // 무게 감지 임계값 (g)
+    private static final double DEFAULT_LIQUID_THRESHOLD = 20.0;  // 액체 판별 임계값 (g)
+
+    @Transactional
+    public CupResponseDTO processWeightData(CupRequestDTO request) {
+        // 입력 검증
+        validateRequest(request);
+
+        // 무게 타입 결정
+        CupWeightType cupType = CupWeightType.fromWeight(request.getWeight());
+
+        // 기본값 설정
+        Double baseWeight = request.getBaseWeight() != null
+            ? request.getBaseWeight()
+            : DEFAULT_BASE_WEIGHT;
+
+        Double weightThreshold = request.getWeightThreshold() != null
+            ? request.getWeightThreshold()
+            : DEFAULT_WEIGHT_THRESHOLD;
+
+        Double liquidThreshold = request.getLiquidThreshold() != null
+            ? request.getLiquidThreshold()
+            : DEFAULT_LIQUID_THRESHOLD;
+
+        // 액체 무게 계산
+        double liquidWeight = 0.0;
+        if (request.getIsliquid()) {
+            liquidWeight = request.getWeight() - baseWeight;
+            if (liquidWeight < 0) {
+                liquidWeight = 0.0;
+            }
+        }
+
+        // 엔티티 생성 및 저장
+        Cup cup = Cup.builder()
+            .uuid(request.getUuid())
+            .binId(request.getBinId())
             .weight(request.getWeight())
             .isLiquid(request.getIsliquid())
             .cupType(cupType)
+            .baseWeight(baseWeight)
             .liquidWeight(liquidWeight)
-            .timestamp(LocalDateTime.now())
+            .weightThreshold(weightThreshold)
+            .liquidThreshold(liquidThreshold)
             .build();
+
+        Cup saved = cupRepository.save(cup);
+        log.info("LoadCell data saved - id: {}, binId: {}, uuid: {}, weight: {}g, isLiquid: {}, cupType: {}",
+            saved.getId(), saved.getBinId(), saved.getUuid(), saved.getWeight(),
+            saved.getIsLiquid(), saved.getCupType());
+
+        return convertToResponseDTO(saved);
     }
 
-    // Mock: 무게 측정 이력 조회
     public List<CupHistoryDTO> getWeightHistory(Long binId, int limit) {
-        List<CupHistoryDTO> history = new ArrayList<>();
+        int validLimit = Math.max(1, Math.min(limit, 20));
 
-        // Mock 데이터 생성
-        for (int i = 0; i < Math.min(limit, 20); i++) {
-            boolean isLiquid = i % 3 == 0; // 3개 중 1개는 액체 포함
-            double weight = isLiquid ? 150.0 + (i * 10) : 5.0 + (i * 0.2);
+        // 최근 데이터 조회
+        List<Cup> history = cupRepository.findByBinIdOrderByCreatedAtDesc(binId);
 
-            history.add(CupHistoryDTO.builder()
-                .recordId((long) (1000 + i))
-                .uuid(UUID.randomUUID().toString())
-                .weight(weight)
-                .isLiquid(isLiquid)
-                .cupType(determineCupType(weight, isLiquid))
-                .timestamp(LocalDateTime.now().minusMinutes(i * 5))
-                .build());
-        }
-
-        return history;
+        // 최대 limit 개수만큼만 반환
+        return history.stream()
+            .limit(validLimit)
+            .map(this::convertToHistoryDTO)
+            .collect(Collectors.toList());
     }
 
-    // Mock: 무게 통계 조회
     public CupStatsDTO getWeightStats(Long binId) {
-        return CupStatsDTO.builder()
-            .totalCups(150)
-            .emptyCups(110)
-            .liquidCups(40)
-            .liquidRate(26.67)
-            .avgEmptyWeight(5.5)
-            .avgLiquidWeight(175.3)
-            .heaviestCup(280.5)
-            .lightestCup(4.2)
-            .weightRangeStats(
-                CupStatsDTO.WeightRangeStats.builder()
-                    .emptyCupCount(110)
-                    .lightLiquidCount(15)
-                    .mediumLiquidCount(20)
-                    .heavyLiquidCount(5)
-                    .build()
-            )
-            .build();
-    }
-
-    // Mock: UUID로 데이터 조회
-    public CupResponseDTO getWeightByUuid(String uuid) {
-        // Mock 데이터 반환
-        return CupResponseDTO.builder()
-            .recordId(12345L)
-            .uuid(uuid)
-            .binId(1L)
-            .weight(5.5)
-            .isLiquid(false)
-            .cupType("EMPTY_CUP")
-            .liquidWeight(0.0)
-            .timestamp(LocalDateTime.now())
-            .build();
-    }
-
-    // 무게로 컵 타입 결정
-    private String determineCupType(Double weight, Boolean isLiquid) {
-        if (!isLiquid && weight >= 4.0 && weight <= 7.0) {
-            return "EMPTY_CUP";
-        } else if (weight >= 20.0 && weight < 100.0) {
-            return "LIGHT_LIQUID";
-        } else if (weight >= 100.0 && weight < 200.0) {
-            return "MEDIUM_LIQUID";
-        } else if (weight >= 200.0 && weight <= 350.0) {
-            return "HEAVY_LIQUID";
+        // 전체 개수
+        Long totalCups = cupRepository.countByBinId(binId);
+        if (totalCups == 0) {
+            return createEmptyStats();
         }
-        return "ABNORMAL";
+
+        Long emptyCupCount = cupRepository.countByBinIdAndCupType(binId, CupWeightType.EMPTY_CUP);
+        Long lightLiquidCount = cupRepository.countByBinIdAndCupType(binId, CupWeightType.LIGHT_LIQUID);
+        Long mediumLiquidCount = cupRepository.countByBinIdAndCupType(binId, CupWeightType.MEDIUM_LIQUID);
+        Long heavyLiquidCount = cupRepository.countByBinIdAndCupType(binId, CupWeightType.HEAVY_LIQUID);
+        Long abnormalCount = cupRepository.countByBinIdAndCupType(binId, CupWeightType.ABNORMAL);
+
+        Long emptyCups = emptyCupCount;
+        long liquidCups = lightLiquidCount + mediumLiquidCount + heavyLiquidCount;
+
+        // 액체 포함 타입들의 평균 무게
+        List<CupWeightType> liquidTypes = Arrays.asList(
+            CupWeightType.LIGHT_LIQUID,
+            CupWeightType.MEDIUM_LIQUID,
+            CupWeightType.HEAVY_LIQUID,
+            CupWeightType.ABNORMAL
+        );
+        Double avgLiquidWeight = cupRepository.getAverageWeightByCupTypes(binId, liquidTypes);
+
+        // 최대/최소 무게
+        Double heaviestCup = cupRepository.getMaxWeight(binId);
+
+        // 총 액체 무게
+        Double totalLiquidWeight = cupRepository.getTotalLiquidWeightByCupTypes(binId, liquidTypes);
+
+        // 액체 비율 계산
+        double liquidRate = ((double) liquidCups / totalCups.doubleValue()) * 100;
+        liquidRate = Math.round(liquidRate * 100.0) / 100.0; // 소수점 2자리
+
+        CupStatsDTO.WeightRangeStats weightRangeStats = CupStatsDTO.WeightRangeStats.builder()
+            .emptyCupCount(emptyCupCount.intValue())
+            .lightLiquidCount(lightLiquidCount.intValue())
+            .mediumLiquidCount(mediumLiquidCount.intValue())
+            .heavyLiquidCount(heavyLiquidCount.intValue())
+            .abnormalCount(abnormalCount.intValue())
+            .build();
+
+        return CupStatsDTO.builder()
+            .totalCups(totalCups.intValue())
+            .emptyCups(emptyCups.intValue())
+            .liquidCups((int) liquidCups)
+            .liquidRate(liquidRate)
+            .totalLiquidWeight(totalLiquidWeight)
+            .avgLiquidWeight(avgLiquidWeight != null ? Math.round(avgLiquidWeight * 10.0) / 10.0 : 0.0)
+            .heaviestCup(heaviestCup != null ? heaviestCup : 0.0)
+            .weightRangeStats(weightRangeStats)
+            .build();
+    }
+
+    public CupResponseDTO getWeightByUuid(String uuid) {
+        Cup cup = cupRepository.findByUuid(uuid)
+            .orElseThrow(() -> new GeneralException(CupErrorCode.UUID_NOT_FOUND));
+
+        return convertToResponseDTO(cup);
+    }
+
+    private void validateRequest(CupRequestDTO request) {
+        if (request.getUuid() == null || request.getUuid().isEmpty()) {
+            throw new GeneralException(CupErrorCode.INVALID_REQUEST);
+        }
+        if (request.getBinId() == null) {
+            throw new GeneralException(CupErrorCode.INVALID_REQUEST);
+        }
+        if (request.getWeight() == null || request.getWeight() < 0) {
+            throw new GeneralException(CupErrorCode.INVALID_WEIGHT);
+        }
+        if (request.getIsliquid() == null) {
+            throw new GeneralException(CupErrorCode.INVALID_REQUEST);
+        }
+    }
+
+    private CupStatsDTO createEmptyStats() {
+        return CupStatsDTO.builder()
+            .totalCups(0)
+            .emptyCups(0)
+            .liquidCups(0)
+            .liquidRate(0.0)
+            .totalLiquidWeight(0.0)
+            .avgLiquidWeight(0.0)
+            .heaviestCup(0.0)
+            .weightRangeStats(CupStatsDTO.WeightRangeStats.builder()
+                .emptyCupCount(0)
+                .lightLiquidCount(0)
+                .mediumLiquidCount(0)
+                .heavyLiquidCount(0)
+                .abnormalCount(0)
+                .build())
+            .build();
+    }
+
+    private CupResponseDTO convertToResponseDTO(Cup cup) {
+        return CupResponseDTO.builder()
+            .recordId(cup.getId())
+            .uuid(cup.getUuid())
+            .binId(cup.getBinId())
+            .weight(cup.getWeight())
+            .isLiquid(cup.getIsLiquid())
+            .cupType(cup.getCupType().name())
+            .liquidWeight(cup.getLiquidWeight())
+            .timestamp(cup.getCreatedAt())
+            .build();
+    }
+
+    private CupHistoryDTO convertToHistoryDTO(Cup cup) {
+        return CupHistoryDTO.builder()
+            .recordId(cup.getId())
+            .uuid(cup.getUuid())
+            .weight(cup.getWeight())
+            .isLiquid(cup.getIsLiquid())
+            .cupType(cup.getCupType().name())
+            .timestamp(cup.getCreatedAt())
+            .build();
     }
 }

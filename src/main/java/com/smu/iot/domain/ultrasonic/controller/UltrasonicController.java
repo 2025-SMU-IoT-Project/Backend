@@ -1,11 +1,11 @@
 package com.smu.iot.domain.ultrasonic.controller;
 
+import com.smu.iot.domain.ultrasonic.code.UltrasonicSuccessCode;
 import com.smu.iot.domain.ultrasonic.dto.request.UltrasonicRequestDTO;
 import com.smu.iot.domain.ultrasonic.dto.response.BinFillRateResponseDTO;
 import com.smu.iot.domain.ultrasonic.dto.response.UltrasonicResponseDTO;
 import com.smu.iot.domain.ultrasonic.service.UltrasonicService;
 import com.smu.iot.global.apipayload.ApiResponse;
-import com.smu.iot.global.apipayload.code.GeneralSuccessCode;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -35,7 +35,7 @@ public class UltrasonicController {
             request.getBinId(), request.getDistanceCm(), request.getFillRate());
 
         UltrasonicResponseDTO response = ultrasonicService.processUltrasonicData(request);
-        return ApiResponse.onSuccess(GeneralSuccessCode.OK, response);
+        return ApiResponse.onSuccess(UltrasonicSuccessCode.ULTRASONIC_DATA_SAVED, response);
     }
 
     @GetMapping("/fill/{binId}")
@@ -47,7 +47,7 @@ public class UltrasonicController {
         log.info("Querying fill rate - binId: {}", binId);
 
         BinFillRateResponseDTO response = ultrasonicService.getCurrentFillRate(binId);
-        return ApiResponse.onSuccess(GeneralSuccessCode.OK, response);
+        return ApiResponse.onSuccess(UltrasonicSuccessCode.FILL_RATE_RETRIEVED, response);
     }
 
     @GetMapping("/history/{binId}")
@@ -62,7 +62,7 @@ public class UltrasonicController {
         log.info("Querying fill rate history - binId: {}, limit: {}", binId, limit);
 
         List<UltrasonicResponseDTO> history = ultrasonicService.getFillRateHistory(binId, limit);
-        return ApiResponse.onSuccess(GeneralSuccessCode.OK, history);
+        return ApiResponse.onSuccess(UltrasonicSuccessCode.HISTORY_RETRIEVED, history);
     }
 
     @GetMapping("/uuid/{uuid}")
@@ -74,6 +74,6 @@ public class UltrasonicController {
         log.info("Querying ultrasonic data by UUID: {}", uuid);
 
         UltrasonicResponseDTO response = ultrasonicService.getDataByUuid(uuid);
-        return ApiResponse.onSuccess(GeneralSuccessCode.OK, response);
+        return ApiResponse.onSuccess(UltrasonicSuccessCode.DATA_RETRIEVED, response);
     }
 }

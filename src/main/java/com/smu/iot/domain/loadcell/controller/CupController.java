@@ -1,12 +1,12 @@
 package com.smu.iot.domain.loadcell.controller;
 
+import com.smu.iot.domain.loadcell.code.CupSuccessCode;
 import com.smu.iot.domain.loadcell.dto.request.CupRequestDTO;
 import com.smu.iot.domain.loadcell.dto.response.CupHistoryDTO;
 import com.smu.iot.domain.loadcell.dto.response.CupResponseDTO;
 import com.smu.iot.domain.loadcell.dto.response.CupStatsDTO;
 import com.smu.iot.domain.loadcell.service.CupService;
 import com.smu.iot.global.apipayload.ApiResponse;
-import com.smu.iot.global.apipayload.code.GeneralSuccessCode;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -17,14 +17,14 @@ import java.util.List;
 
 @Slf4j
 @RestController
-@RequestMapping("/api/sensors/cups")
+@RequestMapping("/api/sensors/cup")
 @RequiredArgsConstructor
 @Tag(name = "로드셀 센서(컵)", description = "컵 무게 측정 및 액체 감지 API")
 public class CupController {
 
     private final CupService cupService;
 
-    @PatchMapping
+    @PostMapping
     @Operation(
         summary = "컵 무게 및 액체 감지 데이터 수신",
         description = "STM32 보드에서 전송한 로드셀 센서 데이터를 처리"
@@ -36,10 +36,10 @@ public class CupController {
             request.getWeight(), request.getIsliquid());
 
         CupResponseDTO response = cupService.processWeightData(request);
-        return ApiResponse.onSuccess(GeneralSuccessCode.OK, response);
+        return ApiResponse.onSuccess(CupSuccessCode.WEIGHT_DATA_SAVED, response);
     }
 
-    @GetMapping("/{binId}/history")
+    @GetMapping("/history/{binId}")
     @Operation(
         summary = "무게 측정 이력 조회",
         description = "특정 쓰레기통의 최근 무게 측정 이력을 조회"
@@ -51,7 +51,7 @@ public class CupController {
         log.info("Querying weight history - binId: {}, limit: {}", binId, limit);
 
         List<CupHistoryDTO> history = cupService.getWeightHistory(binId, limit);
-        return ApiResponse.onSuccess(GeneralSuccessCode.OK, history);
+        return ApiResponse.onSuccess(CupSuccessCode.HISTORY_RETRIEVED, history);
     }
 
     @GetMapping("/stats")
@@ -65,7 +65,7 @@ public class CupController {
         log.info("Querying weight stats - binId: {}", binId);
 
         CupStatsDTO stats = cupService.getWeightStats(binId);
-        return ApiResponse.onSuccess(GeneralSuccessCode.OK, stats);
+        return ApiResponse.onSuccess(CupSuccessCode.STATS_RETRIEVED, stats);
     }
 
     @GetMapping("/uuid/{uuid}")
@@ -77,6 +77,6 @@ public class CupController {
         log.info("Querying weight data by UUID: {}", uuid);
 
         CupResponseDTO response = cupService.getWeightByUuid(uuid);
-        return ApiResponse.onSuccess(GeneralSuccessCode.OK, response);
+        return ApiResponse.onSuccess(CupSuccessCode.DATA_RETRIEVED, response);
     }
 }
