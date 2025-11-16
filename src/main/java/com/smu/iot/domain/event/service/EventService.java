@@ -119,11 +119,11 @@ public class EventService {
 
         // 로드셀(물통) 데이터
         EventDetailDTO.LiquidDTO liquidDTO = null;
-        if (event.getHasLiquid() && event.getCupData() != null) {
+        if (event.getLiquidHistoryData() != null) {
             liquidDTO = EventDetailDTO.LiquidDTO.builder()
                 .detected(true)
-                .addedWeight(event.getCupData().getLiquidWeight())
-                .timestamp(event.getCupTimestamp())
+                .addedWeight(event.getLiquidHistoryData().getAddedWeight())
+                .timestamp(event.getLiquidHistoryData().getMeasuredAt())
                 .build();
         }
 

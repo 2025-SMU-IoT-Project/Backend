@@ -100,10 +100,10 @@ public class LiquidServiceImpl implements LiquidService {
         updateLiquidWeight(liquid, updateLiquidDTO.getWeight());
 
         // LiquidHistory 기록 추가
-        addLiquidHistory(liquid, updateLiquidDTO.getUuid());
+        LiquidHistory liquidHistory = addLiquidHistory(liquid, updateLiquidDTO.getUuid());
 
         // Event 업데이트
-        updateMainEvent(updateLiquidDTO.getUuid(), liquid);
+        updateMainEvent(updateLiquidDTO.getUuid(), liquidHistory);
 
         return liquid;
     }
@@ -118,10 +118,10 @@ public class LiquidServiceImpl implements LiquidService {
         updateLiquidWeight(liquid, updateLiquidDTO.getWeight());
 
         // LiquidHistory 기록 추가
-        addLiquidHistory(liquid, updateLiquidDTO.getUuid());
+        LiquidHistory liquidHistory = addLiquidHistory(liquid, updateLiquidDTO.getUuid());
 
         // Event 업데이트
-        updateMainEvent(updateLiquidDTO.getUuid(), liquid);
+        updateMainEvent(updateLiquidDTO.getUuid(), liquidHistory);
 
         return liquid;
     }
@@ -170,7 +170,7 @@ public class LiquidServiceImpl implements LiquidService {
         liquid.update(newWeight, addedWeight, overloaded, LocalDateTime.now());
     }
 
-    public void addLiquidHistory(Liquid liquid, String uuid) {
+    public LiquidHistory addLiquidHistory(Liquid liquid, String uuid) {
         LiquidHistory history = LiquidHistory.builder()
             .bin(liquid.getBin())
             .liquid(liquid)
@@ -181,18 +181,18 @@ public class LiquidServiceImpl implements LiquidService {
             .uuid(uuid)
             .build();
 
-        liquidHistoryRepository.save(history);
+        return liquidHistoryRepository.save(history);
     }
 
     // 이벤트 업데이트
-    private void updateMainEvent(String uuid, Liquid liquid) {
+    private void updateMainEvent(String uuid, LiquidHistory liquidHistory) {
         if (uuid == null || uuid.isEmpty()) {
             log.warn("UUID is null or empty, skipping event update");
             return;
         }
 
         eventRepository.findByUuid(uuid).ifPresent(event -> {
-            event.linkLiquidData(liquid);
+            event.linkLiquidHistoryData(liquidHistory);
             event.setStatus(Event.EventStatus.LIQUID_MEASURING);
 
             eventRepository.save(event);

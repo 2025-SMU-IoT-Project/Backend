@@ -3,7 +3,7 @@ package com.smu.iot.domain.event.entity;
 import com.smu.iot.domain.bin.entity.Bin;
 import com.smu.iot.domain.ir.entity.Ir;
 import com.smu.iot.domain.laser.entity.CupShape;
-import com.smu.iot.domain.liquid.entitiy.Liquid;
+import com.smu.iot.domain.liquid.entitiy.LiquidHistory;
 import com.smu.iot.domain.loadcell.entity.Cup;
 import com.smu.iot.domain.ultrasonic.entity.Ultrasonic;
 import com.smu.iot.global.entity.BaseEntity;
@@ -53,8 +53,8 @@ public class Event extends BaseEntity {
     private Ultrasonic ultrasonicData;
 
     @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "liquid_id")
-    private Liquid liquidData;
+    @JoinColumn(name = "liquid_history_id")
+    private LiquidHistory liquidHistoryData;
 
     // 센서 데이터 존재 여부 (빠른 조회용)
     @Column(name = "has_ir_data", nullable = false)
@@ -173,8 +173,8 @@ public class Event extends BaseEntity {
         this.ultrasonicTimestamp = LocalDateTime.now();
     }
 
-    public void linkLiquidData(Liquid liquid) {
-        this.liquidData = liquid;
+    public void linkLiquidHistoryData(LiquidHistory liquidHistory) {
+        this.liquidHistoryData = liquidHistory;
         this.hasLiquidData = true;
         this.liquidTimestamp = LocalDateTime.now();
     }
