@@ -1,7 +1,6 @@
 package com.smu.iot.domain.laser.service;
 
-import com.smu.iot.domain.event.entity.Event;
-import com.smu.iot.domain.event.repository.EventRepository;
+import com.smu.iot.domain.event.service.EventService;
 import com.smu.iot.domain.laser.code.LaserErrorCode;
 import com.smu.iot.domain.laser.dto.request.InsertionEventRequestDTO;
 import com.smu.iot.domain.laser.dto.response.EventDetailResponseDTO;
@@ -29,7 +28,7 @@ import java.util.stream.Collectors;
 public class LaserService {
 
     private final InsertionEventRepository eventRepository;
-    private final EventRepository mainEventRepository;
+    private final EventService eventService;
 
     // 유효성 검증 상수
     private static final int MIN_SAMPLE_COUNT = 10;  // 최소 샘플 수
@@ -94,18 +93,12 @@ public class LaserService {
     }
 
     private void updateMainEvent(String uuid, CupShape laserData) {
-        mainEventRepository.findByUuid(uuid).ifPresent(event -> {
-            event.linkLaserData(laserData);
-            event.setStatus(Event.EventStatus.LASER_PROCESSING);
-
-            // 유효성 정보 업데이트
-            if (laserData.getIsValidCup() != null) {
-                event.setIsValidInput(laserData.getIsValidCup());
-            }
-
-            mainEventRepository.save(event);
-            log.info("Main Event updated with Laser data - UUID: {}, EventId: {}", uuid, event.getId());
-        });
+        eventService.registerSensorData(
+            uuid,
+            laserData.getBinId(),
+            EventService.SensorDataType.LASER,
+            laserData
+        );
     }
 
     // 입력 데이터 검증

@@ -1,13 +1,21 @@
 package com.smu.iot.domain.event.service;
 
+import com.smu.iot.domain.bin.entity.Bin;
+import com.smu.iot.domain.bin.repository.BinRepository;
 import com.smu.iot.domain.event.dto.response.EventDetailDTO;
 import com.smu.iot.domain.event.dto.response.EventSummaryDTO;
 import com.smu.iot.domain.event.entity.Event;
 import com.smu.iot.domain.event.repository.EventRepository;
+import com.smu.iot.domain.ir.entity.Ir;
+import com.smu.iot.domain.laser.entity.CupShape;
+import com.smu.iot.domain.liquid.entitiy.LiquidHistory;
+import com.smu.iot.domain.loadcell.entity.Cup;
+import com.smu.iot.domain.ultrasonic.entity.Ultrasonic;
 import com.smu.iot.global.apipayload.code.GeneralErrorCode;
 import com.smu.iot.global.apipayload.exception.GeneralException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +31,108 @@ import java.util.stream.Collectors;
 public class EventService {
 
     private final EventRepository eventRepository;
+    private final BinRepository binRepository;
+
+    @Transactional
+    public Event registerSensorData(String uuid, Long binId, SensorDataType type, Object sensorData) {
+        Event event = getOrCreateEvent(uuid, binId);
+
+        switch (type) {
+            case IR -> {
+                event.linkIrData((Ir) sensorData);
+                if (event.isAllSensorDataReceived()) {
+                    boolean cupAccepted = event.getIsValidInput() && !event.getHasLiquid();
+                    event.setCupAccepted(cupAccepted);
+                    event.completeEvent();
+                }
+            }
+
+            case LASER -> {
+                event.linkLaserData((CupShape) sensorData);
+                if (((CupShape) sensorData).getIsValidCup() != null) {
+                    event.setIsValidInput(((CupShape) sensorData).getIsValidCup());
+                }
+                if (event.isAllSensorDataReceived()) {
+                    boolean cupAccepted = event.getIsValidInput() && !event.getHasLiquid();
+                    event.setCupAccepted(cupAccepted);
+                    event.completeEvent();
+                }
+            }
+            case CUP -> {
+                event.linkCupData((Cup) sensorData);
+                if (((Cup) sensorData).getIsLiquid() != null) {
+                    event.setHasLiquid(((Cup) sensorData).getIsLiquid());
+                }
+                if (event.isAllSensorDataReceived()) {
+                    boolean cupAccepted = event.getIsValidInput() && !event.getHasLiquid();
+                    event.setCupAccepted(cupAccepted);
+                    event.completeEvent();
+                }
+            }
+            case LIQUID -> {
+                event.linkLiquidHistoryData((LiquidHistory) sensorData);
+                if (event.isAllSensorDataReceived()) {
+                    boolean cupAccepted = event.getIsValidInput() && !event.getHasLiquid();
+                    event.setCupAccepted(cupAccepted);
+                    event.completeEvent();
+                }
+            }
+            case ULTRASONIC -> {
+                event.linkUltrasonicData((Ultrasonic) sensorData);
+                if (event.isAllSensorDataReceived()) {
+                    boolean cupAccepted = event.getIsValidInput() && !event.getHasLiquid();
+                    event.setCupAccepted(cupAccepted);
+                    event.completeEvent();
+                }
+            }
+        }
+
+        return eventRepository.save(event);
+    }
+
+    @Transactional
+    public Event getOrCreateEvent(String uuid, Long binId) {
+        // 먼저 조회 시도
+        Event event = eventRepository.findByUuid(uuid).orElse(null);
+
+        if (event != null) {
+            return event;
+        }
+
+        // 없으면 생성 시도
+        try {
+            return createNewEvent(uuid, binId);
+        } catch (DataIntegrityViolationException e) {
+            // 동시에 생성되었을 경우 다시 조회
+            log.warn("Concurrent event creation detected for UUID: {}, retrying...", uuid);
+            return eventRepository.findByUuid(uuid)
+                .orElseThrow(() -> new GeneralException(GeneralErrorCode.INTERNAL_SERVER_ERROR_500));
+        }
+    }
+
+    private Event createNewEvent(String uuid, Long binId) {
+        Bin bin = binRepository.findById(binId)
+            .orElseThrow(() -> new GeneralException(GeneralErrorCode.NOT_FOUND_404));
+
+        Event event = Event.builder()
+            .uuid(uuid)
+            .bin(bin)
+            .status(Event.EventStatus.INITIATED)
+            .hasIrData(false)
+            .hasLaserData(false)
+            .hasCupData(false)
+            .hasUltrasonicData(false)
+            .hasLiquidData(false)
+            .isValidInput(false)
+            .hasLiquid(false)
+            .cupAccepted(false)
+            .startTime(LocalDateTime.now())
+            .build();
+
+        Event saved = eventRepository.save(event);
+        log.info("New Event created - UUID: {}, BinId: {}", uuid, binId);
+        return saved;
+    }
 
     public EventDetailDTO getEventByUuid(String uuid) {
         log.info("Querying event by UUID: {}", uuid);
@@ -188,5 +298,9 @@ public class EventService {
             .cupType(cupType)
             .cupPattern(cupPattern)
             .build();
+    }
+
+    public enum SensorDataType {
+        IR, LASER, CUP, LIQUID, ULTRASONIC
     }
 }

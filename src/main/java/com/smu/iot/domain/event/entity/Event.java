@@ -13,7 +13,7 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "event")
+@Table(name = "event", uniqueConstraints = @UniqueConstraint(columnNames = "uuid"))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

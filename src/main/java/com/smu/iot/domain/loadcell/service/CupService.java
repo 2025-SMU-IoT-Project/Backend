@@ -1,7 +1,6 @@
 package com.smu.iot.domain.loadcell.service;
 
-import com.smu.iot.domain.event.entity.Event;
-import com.smu.iot.domain.event.repository.EventRepository;
+import com.smu.iot.domain.event.service.EventService;
 import com.smu.iot.domain.loadcell.code.CupErrorCode;
 import com.smu.iot.domain.loadcell.dto.request.BinWeightInitRequestDTO;
 import com.smu.iot.domain.loadcell.dto.request.CupRequestDTO;
@@ -36,7 +35,7 @@ public class CupService {
     private final CupRepository cupRepository;
     private final BinWeightRepository binWeightRepository;
     private final BinWeightHistoryRepository binWeightHistoryRepository;
-    private final EventRepository eventRepository;
+    private final EventService eventService;
 
     // 컵통 초기화 (빈 컵통 무게 설정)
     @Transactional
@@ -179,18 +178,12 @@ public class CupService {
     }
 
     private void updateMainEvent(String uuid, Cup cupData) {
-        eventRepository.findByUuid(uuid).ifPresent(event -> {
-            event.linkCupData(cupData);
-            event.setStatus(Event.EventStatus.WEIGHT_MEASURING);
-
-            if (cupData.getIsLiquid() != null) {
-                event.setHasLiquid(cupData.getIsLiquid());
-            }
-
-            eventRepository.save(event);
-            log.info("Main Event updated with Cup data - UUID: {}, EventId: {}",
-                uuid, event.getId());
-        });
+        eventService.registerSensorData(
+            uuid,
+            cupData.getBinId(),
+            EventService.SensorDataType.CUP,
+            cupData
+        );
     }
 
     public List<CupHistoryDTO> getWeightHistory(Long binId, int limit) {

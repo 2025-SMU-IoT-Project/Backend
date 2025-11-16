@@ -5,6 +5,7 @@ import com.smu.iot.domain.bin.entity.Bin;
 import com.smu.iot.domain.bin.repository.BinRepository;
 import com.smu.iot.domain.event.entity.Event;
 import com.smu.iot.domain.event.repository.EventRepository;
+import com.smu.iot.domain.event.service.EventService;
 import com.smu.iot.domain.liquid.code.LiquidErrorCode;
 import com.smu.iot.domain.liquid.converter.LiquidConverter;
 import com.smu.iot.domain.liquid.dto.request.LiquidRequestDTO;
@@ -36,7 +37,7 @@ public class LiquidServiceImpl implements LiquidService {
     private final LiquidRepository liquidRepository;
     private final BinRepository binRepository;
     private final LiquidHistoryRepository liquidHistoryRepository;
-    private final EventRepository eventRepository;
+    private final EventService eventService;
 
     @Override
     public Liquid createLiquid(Long binId, LiquidRequestDTO.CreateLiquidDTO createLiquidDTO) {
@@ -187,19 +188,14 @@ public class LiquidServiceImpl implements LiquidService {
     // 이벤트 업데이트
     private void updateMainEvent(String uuid, LiquidHistory liquidHistory) {
         if (uuid == null || uuid.isEmpty()) {
-            log.warn("UUID is null or empty, skipping event update");
             return;
         }
-
-        eventRepository.findByUuid(uuid).ifPresent(event -> {
-            event.linkLiquidHistoryData(liquidHistory);
-            event.setStatus(Event.EventStatus.LIQUID_MEASURING);
-
-            eventRepository.save(event);
-
-            log.info("Main Event updated with Liquid data - UUID: {}, EventId: {}",
-                uuid, event.getId());
-        });
+        eventService.registerSensorData(
+            uuid,
+            liquidHistory.getBin().getId(),
+            EventService.SensorDataType.LIQUID,
+            liquidHistory
+        );
     }
 
     public List<LiquidHistory> findLiquidsByDate(Long binId, PeriodType period, LocalDate date) {

@@ -3,6 +3,7 @@ package com.smu.iot.domain.ultrasonic.service;
 import com.smu.iot.domain.bin.repository.BinRepository;
 import com.smu.iot.domain.event.entity.Event;
 import com.smu.iot.domain.event.repository.EventRepository;
+import com.smu.iot.domain.event.service.EventService;
 import com.smu.iot.domain.ultrasonic.code.UltrasonicErrorCode;
 import com.smu.iot.domain.ultrasonic.dto.request.UltrasonicRequestDTO;
 import com.smu.iot.domain.ultrasonic.dto.response.BinFillRateResponseDTO;
@@ -27,7 +28,7 @@ import java.util.stream.Collectors;
 public class UltrasonicService {
 
     private final UltrasonicRepository ultrasonicRepository;
-    private final EventRepository eventRepository;
+    private final EventService eventService;
 
     private static final double BIN_HEIGHT = 50.0; // cm
     private static final double COLLECTION_THRESHOLD = 80.0; // 수거 필요 임계값 (%)
@@ -58,33 +59,12 @@ public class UltrasonicService {
     }
 
     private void completeMainEvent(String uuid, Ultrasonic ultrasonicData) {
-        eventRepository.findByUuid(uuid).ifPresent(event -> {
-            // Ultrasonic 데이터 연결
-            event.linkUltrasonicData(ultrasonicData);
-
-            // 최종 검증: 모든 센서 데이터가 수집되었는지 확인
-            if (event.isAllSensorDataReceived()) {
-                // 컵 수용 여부 결정 (레이저로 유효성 확인 + 액체 없는 경우만 수용)
-                boolean cupAccepted = event.getIsValidInput() && !event.getHasLiquid();
-                event.setCupAccepted(cupAccepted);
-
-                // 이벤트 완료 처리
-                event.completeEvent();
-
-                log.info("Event completed - UUID: {}, EventId: {}, Status: {}, CupAccepted: {}",
-                    uuid, event.getId(), event.getStatus(), cupAccepted);
-            } else {
-                // 아직 모든 센서 데이터가 수집되지 않은 경우
-                log.warn("Event not yet complete - UUID: {}, IR: {}, Laser: {}, Cup: {}, Ultrasonic: {}",
-                    uuid,
-                    event.getHasIrData(),
-                    event.getHasLaserData(),
-                    event.getHasCupData(),
-                    event.getHasUltrasonicData());
-            }
-
-            eventRepository.save(event);
-        });
+        eventService.registerSensorData(
+            uuid,
+            ultrasonicData.getBinId(),
+            EventService.SensorDataType.ULTRASONIC,
+            ultrasonicData
+        );
     }
 
     public BinFillRateResponseDTO getCurrentFillRate(Long binId) {

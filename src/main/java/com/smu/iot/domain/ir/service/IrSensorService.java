@@ -1,9 +1,6 @@
 package com.smu.iot.domain.ir.service;
 
-import com.smu.iot.domain.bin.entity.Bin;
-import com.smu.iot.domain.bin.repository.BinRepository;
-import com.smu.iot.domain.event.entity.Event;
-import com.smu.iot.domain.event.repository.EventRepository;
+import com.smu.iot.domain.event.service.EventService;
 import com.smu.iot.domain.ir.code.IrSensorErrorCode;
 import com.smu.iot.domain.ir.dto.request.IrSensorEventDto;
 import com.smu.iot.domain.ir.dto.response.SensorEventResponse;
@@ -14,14 +11,12 @@ import com.smu.iot.domain.ir.entity.code.InputStatus;
 import com.smu.iot.domain.ir.entity.code.SensorEventType;
 import com.smu.iot.domain.ir.repository.CupInputRecordRepository;
 import com.smu.iot.domain.ir.repository.IrSensorEventRepository;
-import com.smu.iot.global.apipayload.code.GeneralErrorCode;
 import com.smu.iot.global.apipayload.exception.GeneralException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -33,8 +28,8 @@ public class IrSensorService {
 
     private final IrSensorEventRepository irSensorEventRepository;
     private final CupInputRecordRepository cupInputRecordRepository;
-    private final EventRepository eventRepository;
-    private final BinRepository binRepository;
+
+    private final EventService eventService;
 
     @Transactional
     public SensorEventResponse processIrEvent(IrSensorEventDto dto) {
@@ -58,36 +53,12 @@ public class IrSensorService {
     }
 
     private void createOrUpdateEvent(IrSensorEventDto dto, Ir irData) {
-        Event event = eventRepository.findByUuid(dto.getUuid())
-            .orElseGet(() -> createNewEvent(dto));
-
-        // IR 데이터 연결
-        event.linkIrData(irData);
-
-        eventRepository.save(event);
-        log.info("Event updated with IR data - UUID: {}, EventId: {}", dto.getUuid(), event.getId());
-    }
-
-    private Event createNewEvent(IrSensorEventDto dto) {
-        Bin bin = binRepository.findById(Long.valueOf(dto.getBinId()))
-            .orElseThrow(() -> new GeneralException(GeneralErrorCode.NOT_FOUND_404));
-
-        Event event = Event.builder()
-            .uuid(dto.getUuid())
-            .bin(bin)
-            .status(Event.EventStatus.IR_DETECTED)
-            .hasIrData(false)
-            .hasLaserData(false)
-            .hasCupData(false)
-            .hasUltrasonicData(false)
-            .isValidInput(false)
-            .hasLiquid(false)
-            .cupAccepted(false)
-            .startTime(LocalDateTime.now())
-            .build();
-
-        log.info("New Event created - UUID: {}, BinId: {}", dto.getUuid(), dto.getBinId());
-        return event;
+        eventService.registerSensorData(
+            dto.getUuid(),
+            Long.valueOf(dto.getBinId()),
+            EventService.SensorDataType.IR,
+            irData
+        );
     }
 
     private SensorEventResponse handleEntryDetection(Ir event) {
