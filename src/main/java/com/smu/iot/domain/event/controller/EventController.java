@@ -54,7 +54,7 @@ public class EventController {
     @GetMapping("/range")
     @Operation(
         summary = "특정 기간 투입 이벤트 조회",
-        description = "시작일과 종료일 사이의 투입 이벤트를 조회"
+        description = "특정 쓰레기통의 시작일과 종료일 사이의 투입 이벤트를 조회(DateTime)"
     )
     public ApiResponse<List<EventSummaryDTO>> getEventsByDateRange(
         @RequestParam(defaultValue = "1") Long binId,

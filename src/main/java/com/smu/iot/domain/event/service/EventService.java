@@ -154,26 +154,19 @@ public class EventService {
             .collect(Collectors.toList());
     }
 
-    // Mock: 날짜 범위로 이벤트 조회
     public List<EventSummaryDTO> getEventsByDateRange(
-        Long binId, LocalDateTime startDate, LocalDateTime endDate) {
+        Long binId,
+        LocalDateTime startDate,
+        LocalDateTime endDate) {
 
-        List<EventSummaryDTO> events = new ArrayList<>();
+        log.info("Querying events by date range - binId: {}, start: {}, end: {}",
+            binId, startDate, endDate);
 
-        // Mock: 날짜 범위 내 10개 이벤트 생성
-        for (int i = 0; i < 10; i++) {
-            events.add(EventSummaryDTO.builder()
-                .uuid("550e8400-e29b-41d4-a716-" + String.format("%012d", i))
-                .binId(binId)
-                .timestamp(startDate.plusHours(i * 2))
-                .isValidInput(true)
-                .hasLiquid(i % 3 == 0)
-                .cupType(i % 3 == 0 ? "LIQUID_CUP" : "EMPTY_CUP")
-                .cupPattern("NORMAL_CUP")
-                .build());
-        }
+        List<Event> events = eventRepository.findByBinIdAndDateRange(binId, startDate, endDate);
 
-        return events;
+        return events.stream()
+            .map(this::convertToSummaryDTO)
+            .collect(Collectors.toList());
     }
 
     private EventDetailDTO convertToDetailDTO(Event event) {
