@@ -115,7 +115,7 @@ public class EventService {
                 .build();
         }
 
-        // 로드셀 데이터
+        // 로드셀(컵통) 데이터
         EventDetailDTO.LoadCellDTO loadCellDTO = null;
         if (event.getHasCupData() && event.getCupData() != null) {
             loadCellDTO = EventDetailDTO.LoadCellDTO.builder()
@@ -123,6 +123,16 @@ public class EventService {
                 .weight(event.getCupData().getWeight())
                 .isLiquid(event.getCupData().getIsLiquid())
                 .cupType(event.getCupData().getCupType().name())
+                .timestamp(event.getCupTimestamp())
+                .build();
+        }
+
+        // 로드셀(물통) 데이터
+        EventDetailDTO.LiquidDTO liquidDTO = null;
+        if (event.getHasLiquid() && event.getCupData() != null) {
+            liquidDTO = EventDetailDTO.LiquidDTO.builder()
+                .detected(true)
+                .addedWeight(event.getCupData().getLiquidWeight())
                 .timestamp(event.getCupTimestamp())
                 .build();
         }
@@ -143,6 +153,7 @@ public class EventService {
             .irSensor(irSensorDTO)
             .laserSensor(laserSensorDTO)
             .loadCell(loadCellDTO)
+            .liquid(liquidDTO)
             .ultrasonic(ultrasonicDTO)
             .build();
 

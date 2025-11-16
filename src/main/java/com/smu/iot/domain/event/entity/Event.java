@@ -3,6 +3,7 @@ package com.smu.iot.domain.event.entity;
 import com.smu.iot.domain.bin.entity.Bin;
 import com.smu.iot.domain.ir.entity.Ir;
 import com.smu.iot.domain.laser.entity.CupShape;
+import com.smu.iot.domain.liquid.entitiy.Liquid;
 import com.smu.iot.domain.loadcell.entity.Cup;
 import com.smu.iot.domain.ultrasonic.entity.Ultrasonic;
 import com.smu.iot.global.entity.BaseEntity;
@@ -51,6 +52,10 @@ public class Event extends BaseEntity {
     @JoinColumn(name = "ultrasonic_id")
     private Ultrasonic ultrasonicData;
 
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "liquid_id")
+    private Liquid liquidData;
+
     // 센서 데이터 존재 여부 (빠른 조회용)
     @Column(name = "has_ir_data", nullable = false)
     private Boolean hasIrData;
@@ -63,6 +68,9 @@ public class Event extends BaseEntity {
 
     @Column(name = "has_ultrasonic_data", nullable = false)
     private Boolean hasUltrasonicData;
+
+    @Column(name = "has_liquid_data", nullable = false)
+    private Boolean hasLiquidData;
 
     // 이벤트 결과 요약
     @Column(name = "is_valid_input", nullable = false)
@@ -99,12 +107,17 @@ public class Event extends BaseEntity {
     @Column(name = "ultrasonic_timestamp")
     private LocalDateTime ultrasonicTimestamp;
 
+    @Column(name = "liquid_timestamp")
+    private LocalDateTime liquidTimestamp;
+
     @Getter
     public enum EventStatus {
         INITIATED("초기화"),
         IR_DETECTED("IR 감지"),
         LASER_PROCESSING("레이저 측정중"),
-        WEIGHT_MEASURING("무게 측정중"),
+        WEIGHT_MEASURING("컵 무게 측정중"),
+        LIQUID_MEASURING("액체 무게 측정중"),
+        ULTRASONIC_MEASURING("채움률 측정중"),
         COMPLETED("완료"),
         REJECTED("거부됨"),
         ERROR("오류"),
@@ -158,6 +171,12 @@ public class Event extends BaseEntity {
         this.ultrasonicData = ultrasonic;
         this.hasUltrasonicData = true;
         this.ultrasonicTimestamp = LocalDateTime.now();
+    }
+
+    public void linkLiquidData(Liquid liquid) {
+        this.liquidData = liquid;
+        this.hasLiquidData = true;
+        this.liquidTimestamp = LocalDateTime.now();
     }
 
     public Long getBinId() {
