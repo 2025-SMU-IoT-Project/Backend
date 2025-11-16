@@ -3,8 +3,6 @@ package com.smu.iot.domain.liquid.service.impl;
 import com.smu.iot.domain.bin.code.BinErrorCode;
 import com.smu.iot.domain.bin.entity.Bin;
 import com.smu.iot.domain.bin.repository.BinRepository;
-import com.smu.iot.domain.event.entity.Event;
-import com.smu.iot.domain.event.repository.EventRepository;
 import com.smu.iot.domain.event.service.EventService;
 import com.smu.iot.domain.liquid.code.LiquidErrorCode;
 import com.smu.iot.domain.liquid.converter.LiquidConverter;
@@ -98,7 +96,7 @@ public class LiquidServiceImpl implements LiquidService {
         });
 
         // weight, addedWeight 업데이트
-        updateLiquidWeight(liquid, updateLiquidDTO.getWeight());
+        updateLiquidWeight(liquid, updateLiquidDTO.getWeight(), updateLiquidDTO.getUuid());
 
         // LiquidHistory 기록 추가
         LiquidHistory liquidHistory = addLiquidHistory(liquid, updateLiquidDTO.getUuid());
@@ -116,7 +114,7 @@ public class LiquidServiceImpl implements LiquidService {
         });
 
         // weight, addedWeight 업데이트
-        updateLiquidWeight(liquid, updateLiquidDTO.getWeight());
+        updateLiquidWeight(liquid, updateLiquidDTO.getWeight(), updateLiquidDTO.getUuid());
 
         // LiquidHistory 기록 추가
         LiquidHistory liquidHistory = addLiquidHistory(liquid, updateLiquidDTO.getUuid());
@@ -163,12 +161,12 @@ public class LiquidServiceImpl implements LiquidService {
         return LiquidConverter.toLiquidTrendDTO(binId, histories, period, mode);
     }
 
-    public void updateLiquidWeight(Liquid liquid, double newWeight) {
+    public void updateLiquidWeight(Liquid liquid, double newWeight, String uuid) {
         double oldWeight = liquid.getWeight();
         double addedWeight = (newWeight > oldWeight) ? newWeight - oldWeight : 0;
         Boolean overloaded = (newWeight >= 4000);
 
-        liquid.update(newWeight, addedWeight, overloaded, LocalDateTime.now());
+        liquid.update(newWeight, addedWeight, overloaded, LocalDateTime.now(), uuid);
     }
 
     public LiquidHistory addLiquidHistory(Liquid liquid, String uuid) {

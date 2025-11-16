@@ -1,15 +1,15 @@
 package com.smu.iot.domain.liquid.dto.request;
 
-import lombok.Getter;
+import lombok.Data;
 
 public class LiquidRequestDTO {
 
-    @Getter
+    @Data
     public static class CreateLiquidDTO {
         private double weight;
     }
 
-    @Getter
+    @Data
     public static class UpdateLiquidDTO {
         private double weight;
         private String uuid;

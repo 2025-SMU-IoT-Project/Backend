@@ -45,10 +45,12 @@ public class Liquid {
         this.bin = bin;
     }
 
-    public void update(double weight, double addedWeight, boolean overloaded, LocalDateTime measuredAt) {
+    public void update(double weight, double addedWeight, boolean overloaded, LocalDateTime measuredAt, String uuid) {
+        this.lastUuid = this.uuid;
+        this.uuid = uuid;
         this.weight = weight;
         this.addedWeight = addedWeight;
         this.overloaded = overloaded;
-        this.measuredAt = LocalDateTime.now();
+        this.measuredAt = measuredAt;
     }
 }
