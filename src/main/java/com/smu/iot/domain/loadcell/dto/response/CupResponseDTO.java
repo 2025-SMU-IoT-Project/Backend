@@ -12,12 +12,9 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class CupResponseDTO {
-    private Long recordId;
-    private String uuid;
-    private Long binId;
-    private Double weight;
-    private Boolean isLiquid;
-    private String cupType;          // EMPTY_CUP, LIGHT_LIQUID, MEDIUM_LIQUID, HEAVY_LIQUID
-    private Double liquidWeight;     // 액체 무게
-    private LocalDateTime timestamp;
+    private Long recordId;      // Cup 레코드 ID
+    private String uuid;        // 이벤트 고유 ID
+    private Long binId;         // 쓰레기통 ID
+    private Double weight;      // 투입된 컵의 무게 (g)
+    private LocalDateTime timestamp;  // 기록 시간
 }

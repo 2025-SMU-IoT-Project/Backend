@@ -9,8 +9,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class CupRequestDTO {
-    private String uuid;    // 이벤트 고유 ID
-    private Long binId;     // 쓰레기통 ID
-    private Double weight;  // 컵통의 현재 총 무게 (g)
+public class BinWeightInitRequestDTO {
+    private Long binId;         // 쓰레기통 ID
+    private Double tareWeight;  // 빈 컵통의 무게 (g)
 }

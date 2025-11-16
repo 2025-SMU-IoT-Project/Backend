@@ -3,12 +3,18 @@ package com.smu.iot.domain.loadcell.service;
 import com.smu.iot.domain.event.entity.Event;
 import com.smu.iot.domain.event.repository.EventRepository;
 import com.smu.iot.domain.loadcell.code.CupErrorCode;
+import com.smu.iot.domain.loadcell.dto.request.BinWeightInitRequestDTO;
 import com.smu.iot.domain.loadcell.dto.request.CupRequestDTO;
+import com.smu.iot.domain.loadcell.dto.response.BinWeightHistoryDTO;
 import com.smu.iot.domain.loadcell.dto.response.CupHistoryDTO;
 import com.smu.iot.domain.loadcell.dto.response.CupResponseDTO;
 import com.smu.iot.domain.loadcell.dto.response.CupStatsDTO;
+import com.smu.iot.domain.loadcell.entity.BinWeight;
+import com.smu.iot.domain.loadcell.entity.BinWeightHistory;
 import com.smu.iot.domain.loadcell.entity.Cup;
 import com.smu.iot.domain.loadcell.entity.Cup.CupWeightType;
+import com.smu.iot.domain.loadcell.repository.BinWeightHistoryRepository;
+import com.smu.iot.domain.loadcell.repository.BinWeightRepository;
 import com.smu.iot.domain.loadcell.repository.CupRepository;
 import com.smu.iot.global.apipayload.exception.GeneralException;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +22,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -27,64 +34,148 @@ import java.util.stream.Collectors;
 public class CupService {
 
     private final CupRepository cupRepository;
+    private final BinWeightRepository binWeightRepository;
+    private final BinWeightHistoryRepository binWeightHistoryRepository;
     private final EventRepository eventRepository;
 
-    // 기본 설정값
-    private static final double DEFAULT_BASE_WEIGHT = 5.5;        // 빈 컵 기준 무게 (g)
-    private static final double DEFAULT_WEIGHT_THRESHOLD = 1.0;   // 무게 감지 임계값 (g)
-    private static final double DEFAULT_LIQUID_THRESHOLD = 20.0;  // 액체 판별 임계값 (g)
-
+    // 컵통 초기화 (빈 컵통 무게 설정)
     @Transactional
-    public CupResponseDTO processWeightData(CupRequestDTO request) {
-        // 입력 검증
-        validateRequest(request);
-
-        // 무게 타입 결정
-        CupWeightType cupType = CupWeightType.fromWeight(request.getWeight());
-
-        // 기본값 설정
-        Double baseWeight = request.getBaseWeight() != null
-            ? request.getBaseWeight()
-            : DEFAULT_BASE_WEIGHT;
-
-        Double weightThreshold = request.getWeightThreshold() != null
-            ? request.getWeightThreshold()
-            : DEFAULT_WEIGHT_THRESHOLD;
-
-        Double liquidThreshold = request.getLiquidThreshold() != null
-            ? request.getLiquidThreshold()
-            : DEFAULT_LIQUID_THRESHOLD;
-
-        // 액체 무게 계산
-        double liquidWeight = 0.0;
-        if (request.getIsliquid()) {
-            liquidWeight = request.getWeight() - baseWeight;
-            if (liquidWeight < 0) {
-                liquidWeight = 0.0;
-            }
+    public void initializeBinWeight(BinWeightInitRequestDTO request) {
+        if (request.getBinId() == null) {
+            throw new GeneralException(CupErrorCode.INVALID_REQUEST);
+        }
+        if (request.getTareWeight() == null || request.getTareWeight() < 0) {
+            throw new GeneralException(CupErrorCode.INVALID_WEIGHT);
         }
 
-        // 엔티티 생성 및 저장
+        BinWeight binWeight = binWeightRepository.findByBinId(request.getBinId())
+            .orElseGet(() -> BinWeight.builder()
+                .binId(request.getBinId())
+                .build());
+
+        binWeight.setTareWeight(request.getTareWeight());
+        binWeight.setCurrentWeight(request.getTareWeight());
+        binWeight.setPreviousWeight(request.getTareWeight());
+        binWeight.setIsInitialized(true);
+
+        binWeightRepository.save(binWeight);
+        log.info("BinWeight initialized - binId: {}, tareWeight: {}g",
+            request.getBinId(), request.getTareWeight());
+    }
+
+    // 컵통 무게 데이터 처리
+    @Transactional
+    public CupResponseDTO processWeightData(CupRequestDTO request) {
+        validateRequest(request);
+
+        Long binId = request.getBinId();
+        Double currentBinWeight = request.getWeight();
+
+        BinWeight binWeight = binWeightRepository.findByBinId(binId)
+            .orElseThrow(() -> {
+                log.error("BinWeight not initialized for binId: {}", binId);
+                return new GeneralException(CupErrorCode.BIN_NOT_INITIALIZED);
+            });
+
+        if (!binWeight.getIsInitialized()) {
+            log.error("BinWeight not initialized for binId: {}", binId);
+            throw new GeneralException(CupErrorCode.BIN_NOT_INITIALIZED);
+        }
+
+        Double previousWeight = binWeight.getCurrentWeight();
+        Double cupWeight = currentBinWeight - previousWeight;
+
+        if (cupWeight <= 0) {
+            log.warn("Invalid cup weight detected - binId: {}, cupWeight: {}g (current: {}g, previous: {}g)",
+                binId, cupWeight, currentBinWeight, previousWeight);
+            throw new GeneralException(CupErrorCode.INVALID_WEIGHT);
+        }
+
+        CupWeightType cupType = CupWeightType.fromWeight(cupWeight);
+
+        // Cup 엔티티 저장
         Cup cup = Cup.builder()
             .uuid(request.getUuid())
-            .binId(request.getBinId())
-            .weight(request.getWeight())
-            .isLiquid(request.getIsliquid())
+            .binId(binId)
+            .weight(cupWeight)
+            .isLiquid(cupWeight > 20.0)
             .cupType(cupType)
-            .baseWeight(baseWeight)
-            .liquidWeight(liquidWeight)
-            .weightThreshold(weightThreshold)
-            .liquidThreshold(liquidThreshold)
+            .baseWeight(null)
+            .liquidWeight(cupWeight > 20.0 ? cupWeight - 5.0 : 0.0)
+            .weightThreshold(null)
+            .liquidThreshold(null)
             .build();
 
-        Cup saved = cupRepository.save(cup);
-        log.info("LoadCell data saved - id: {}, binId: {}, uuid: {}, weight: {}g, isLiquid: {}, cupType: {}",
-            saved.getId(), saved.getBinId(), saved.getUuid(), saved.getWeight(),
-            saved.getIsLiquid(), saved.getCupType());
+        Cup savedCup = cupRepository.save(cup);
+        log.info("Cup data saved - id: {}, binId: {}, uuid: {}, cupWeight: {}g, cupType: {}",
+            savedCup.getId(), savedCup.getBinId(), savedCup.getUuid(),
+            savedCup.getWeight(), savedCup.getCupType());
 
-        updateMainEvent(request.getUuid(), saved);
+        // BinWeightHistory 저장
+        BinWeightHistory history = BinWeightHistory.builder()
+            .binId(binId)
+            .currentWeight(currentBinWeight)
+            .addedWeight(cupWeight)
+            .uuid(request.getUuid())
+            .cupId(savedCup.getId())
+            .build();
 
-        return convertToResponseDTO(saved);
+        binWeightHistoryRepository.save(history);
+        log.info("BinWeightHistory saved - binId: {}, currentWeight: {}g, addedWeight: {}g",
+            binId, currentBinWeight, cupWeight);
+
+        // BinWeight 업데이트 (현재 상태만 유지)
+        binWeight.setPreviousWeight(previousWeight);
+        binWeight.setCurrentWeight(currentBinWeight);
+        binWeightRepository.save(binWeight);
+        log.info("BinWeight updated - binId: {}, previousWeight: {}g, currentWeight: {}g",
+            binId, previousWeight, currentBinWeight);
+
+        updateMainEvent(request.getUuid(), savedCup);
+
+        return convertToResponseDTO(savedCup);
+    }
+
+    // 컵통 무게 리셋
+    @Transactional
+    public void resetBinWeight(Long binId) {
+        BinWeight binWeight = binWeightRepository.findByBinId(binId)
+            .orElseThrow(() -> new GeneralException(CupErrorCode.BIN_NOT_FOUND));
+
+        if (!binWeight.getIsInitialized()) {
+            throw new GeneralException(CupErrorCode.BIN_NOT_INITIALIZED);
+        }
+
+        binWeight.setCurrentWeight(binWeight.getTareWeight());
+        binWeight.setPreviousWeight(binWeight.getTareWeight());
+        binWeightRepository.save(binWeight);
+
+        log.info("BinWeight reset to tare weight - binId: {}, tareWeight: {}g",
+            binId, binWeight.getTareWeight());
+    }
+
+    // 컵통 무게 히스토리 조회
+    public List<BinWeightHistoryDTO> getBinWeightHistory(Long binId, int limit) {
+        int validLimit = Math.max(1, Math.min(limit, 100));
+
+        List<BinWeightHistory> history = binWeightHistoryRepository.findByBinIdOrderByCreatedAtDesc(binId);
+
+        return history.stream()
+            .limit(validLimit)
+            .map(this::convertToBinWeightHistoryDTO)
+            .collect(Collectors.toList());
+    }
+
+    // 시간 범위별 컵통 무게 히스토리 조회 (그래프용)
+    public List<BinWeightHistoryDTO> getBinWeightHistoryByTimeRange(
+        Long binId, LocalDateTime startTime, LocalDateTime endTime) {
+
+        List<BinWeightHistory> history = binWeightHistoryRepository
+            .findByBinIdAndTimeRange(binId, startTime, endTime);
+
+        return history.stream()
+            .map(this::convertToBinWeightHistoryDTO)
+            .collect(Collectors.toList());
     }
 
     private void updateMainEvent(String uuid, Cup cupData) {
@@ -92,23 +183,20 @@ public class CupService {
             event.linkCupData(cupData);
             event.setStatus(Event.EventStatus.WEIGHT_MEASURING);
 
-            // 액체 정보 업데이트
             if (cupData.getIsLiquid() != null) {
                 event.setHasLiquid(cupData.getIsLiquid());
             }
 
             eventRepository.save(event);
-            log.info("Main Event updated with Cup data - UUID: {}, EventId: {}", uuid, event.getId());
+            log.info("Main Event updated with Cup data - UUID: {}, EventId: {}",
+                uuid, event.getId());
         });
     }
 
     public List<CupHistoryDTO> getWeightHistory(Long binId, int limit) {
         int validLimit = Math.max(1, Math.min(limit, 20));
-
-        // 최근 데이터 조회
         List<Cup> history = cupRepository.findByBinIdOrderByCreatedAtDesc(binId);
 
-        // 최대 limit 개수만큼만 반환
         return history.stream()
             .limit(validLimit)
             .map(this::convertToHistoryDTO)
@@ -116,7 +204,6 @@ public class CupService {
     }
 
     public CupStatsDTO getWeightStats(Long binId) {
-        // 전체 개수
         Long totalCups = cupRepository.countByBinId(binId);
         if (totalCups == 0) {
             return createEmptyStats();
@@ -131,7 +218,6 @@ public class CupService {
         Long emptyCups = emptyCupCount;
         long liquidCups = lightLiquidCount + mediumLiquidCount + heavyLiquidCount;
 
-        // 액체 포함 타입들의 평균 무게
         List<CupWeightType> liquidTypes = Arrays.asList(
             CupWeightType.LIGHT_LIQUID,
             CupWeightType.MEDIUM_LIQUID,
@@ -139,16 +225,11 @@ public class CupService {
             CupWeightType.ABNORMAL
         );
         Double avgLiquidWeight = cupRepository.getAverageWeightByCupTypes(binId, liquidTypes);
-
-        // 최대/최소 무게
         Double heaviestCup = cupRepository.getMaxWeight(binId);
-
-        // 총 액체 무게
         Double totalLiquidWeight = cupRepository.getTotalLiquidWeightByCupTypes(binId, liquidTypes);
 
-        // 액체 비율 계산
         double liquidRate = ((double) liquidCups / totalCups.doubleValue()) * 100;
-        liquidRate = Math.round(liquidRate * 100.0) / 100.0; // 소수점 2자리
+        liquidRate = Math.round(liquidRate * 100.0) / 100.0;
 
         CupStatsDTO.WeightRangeStats weightRangeStats = CupStatsDTO.WeightRangeStats.builder()
             .emptyCupCount(emptyCupCount.intValue())
@@ -187,9 +268,6 @@ public class CupService {
         if (request.getWeight() == null || request.getWeight() < 0) {
             throw new GeneralException(CupErrorCode.INVALID_WEIGHT);
         }
-        if (request.getIsliquid() == null) {
-            throw new GeneralException(CupErrorCode.INVALID_REQUEST);
-        }
     }
 
     private CupStatsDTO createEmptyStats() {
@@ -217,9 +295,6 @@ public class CupService {
             .uuid(cup.getUuid())
             .binId(cup.getBinId())
             .weight(cup.getWeight())
-            .isLiquid(cup.getIsLiquid())
-            .cupType(cup.getCupType().name())
-            .liquidWeight(cup.getLiquidWeight())
             .timestamp(cup.getCreatedAt())
             .build();
     }
@@ -232,6 +307,17 @@ public class CupService {
             .isLiquid(cup.getIsLiquid())
             .cupType(cup.getCupType().name())
             .timestamp(cup.getCreatedAt())
+            .build();
+    }
+
+    private BinWeightHistoryDTO convertToBinWeightHistoryDTO(BinWeightHistory history) {
+        return BinWeightHistoryDTO.builder()
+            .id(history.getId())
+            .binId(history.getBinId())
+            .currentWeight(history.getCurrentWeight())
+            .addedWeight(history.getAddedWeight())
+            .uuid(history.getUuid())
+            .timestamp(history.getCreatedAt())
             .build();
     }
 }
