@@ -1,5 +1,6 @@
 package com.smu.iot.domain.ir.service;
 
+import com.smu.iot.domain.event.service.EventService;
 import com.smu.iot.domain.ir.code.IrSensorErrorCode;
 import com.smu.iot.domain.ir.dto.request.IrSensorEventDto;
 import com.smu.iot.domain.ir.dto.response.SensorEventResponse;
@@ -28,6 +29,8 @@ public class IrSensorService {
     private final IrSensorEventRepository irSensorEventRepository;
     private final CupInputRecordRepository cupInputRecordRepository;
 
+    private final EventService eventService;
+
     @Transactional
     public SensorEventResponse processIrEvent(IrSensorEventDto dto) {
 
@@ -35,6 +38,9 @@ public class IrSensorService {
 
         // 센서 이벤트 저장
         Ir event = createAndSaveEvent(dto);
+
+        // Event 생성 또는 업데이트
+        createOrUpdateEvent(dto, event);
 
         // 센서 타입별 처리
         if ("IR1".equals(dto.getSensorId())) {
@@ -44,6 +50,15 @@ public class IrSensorService {
         }
 
         throw new GeneralException(IrSensorErrorCode.UNKNOWN_SENSOR_ID);
+    }
+
+    private void createOrUpdateEvent(IrSensorEventDto dto, Ir irData) {
+        eventService.registerSensorData(
+            dto.getUuid(),
+            Long.valueOf(dto.getBinId()),
+            EventService.SensorDataType.IR,
+            irData
+        );
     }
 
     private SensorEventResponse handleEntryDetection(Ir event) {

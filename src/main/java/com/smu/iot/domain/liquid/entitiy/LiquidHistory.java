@@ -24,6 +24,9 @@ public class LiquidHistory {
 
     private Boolean overload;
 
+    @Column(name = "uuid", length = 36)
+    private String uuid;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "liquid_id")
     private Liquid liquid;

@@ -28,6 +28,10 @@ public enum CupErrorCode implements BaseErrorCode {
     INVALID_REQUEST(HttpStatus.BAD_REQUEST,
         "LOADCELL_4005",
         "유효하지 않은 요청입니다."
+    ),
+    BIN_NOT_INITIALIZED(HttpStatus.BAD_REQUEST,
+        "LOADCELL_4006",
+        "컵통이 초기화되지 않았습니다."
     );
 
     private final HttpStatus status;

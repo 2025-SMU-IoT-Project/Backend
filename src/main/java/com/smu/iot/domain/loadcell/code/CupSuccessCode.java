@@ -24,6 +24,10 @@ public enum CupSuccessCode implements BaseSuccessCode {
     DATA_RETRIEVED(HttpStatus.OK,
         "LOADCELL_2003",
         "로드셀 데이터가 조회되었습니다."
+    ),
+    BIN_INITIALIZED(HttpStatus.OK,
+        "LOADCELL_2004",
+        "컵통 무게가 초기화 되었습니다."
     );
 
     private final HttpStatus status;

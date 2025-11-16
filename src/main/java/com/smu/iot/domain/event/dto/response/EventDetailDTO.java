@@ -28,6 +28,7 @@ public class EventDetailDTO {
         private IrSensorDTO irSensor;
         private LaserSensorDTO laserSensor;
         private LoadCellDTO loadCell;
+        private LiquidDTO liquid;
         private UltrasonicDTO ultrasonic;
     }
 
@@ -75,6 +76,16 @@ public class EventDetailDTO {
         private Double weight;
         private Boolean isLiquid;
         private String cupType;
+        private LocalDateTime timestamp;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class LiquidDTO {
+        private Boolean detected;
+        private Double addedWeight;
         private LocalDateTime timestamp;
     }
 

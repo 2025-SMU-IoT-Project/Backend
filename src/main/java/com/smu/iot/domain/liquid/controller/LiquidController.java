@@ -20,7 +20,7 @@ import java.time.LocalDate;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/sensors/weight/liquids")
-@Tag(name = "무게 센서", description = "물통 로드셀 + HX711 센서 API")
+@Tag(name = "로드셀 센서(물통)", description = "물통 로드셀 + HX711 센서 API")
 public class LiquidController {
     private final LiquidService liquidService;
 

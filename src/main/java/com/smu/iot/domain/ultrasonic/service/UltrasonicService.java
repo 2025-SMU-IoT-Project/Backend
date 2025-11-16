@@ -1,6 +1,9 @@
 package com.smu.iot.domain.ultrasonic.service;
 
 import com.smu.iot.domain.bin.repository.BinRepository;
+import com.smu.iot.domain.event.entity.Event;
+import com.smu.iot.domain.event.repository.EventRepository;
+import com.smu.iot.domain.event.service.EventService;
 import com.smu.iot.domain.ultrasonic.code.UltrasonicErrorCode;
 import com.smu.iot.domain.ultrasonic.dto.request.UltrasonicRequestDTO;
 import com.smu.iot.domain.ultrasonic.dto.response.BinFillRateResponseDTO;
@@ -25,7 +28,7 @@ import java.util.stream.Collectors;
 public class UltrasonicService {
 
     private final UltrasonicRepository ultrasonicRepository;
-    private final BinRepository binRepository;
+    private final EventService eventService;
 
     private static final double BIN_HEIGHT = 50.0; // cm
     private static final double COLLECTION_THRESHOLD = 80.0; // 수거 필요 임계값 (%)
@@ -50,7 +53,18 @@ public class UltrasonicService {
 
         Ultrasonic saved = ultrasonicRepository.save(ultrasonic);
 
+        completeMainEvent(request.getUuid(), saved);
+
         return convertToResponseDTO(saved);
+    }
+
+    private void completeMainEvent(String uuid, Ultrasonic ultrasonicData) {
+        eventService.registerSensorData(
+            uuid,
+            ultrasonicData.getBinId(),
+            EventService.SensorDataType.ULTRASONIC,
+            ultrasonicData
+        );
     }
 
     public BinFillRateResponseDTO getCurrentFillRate(Long binId) {
