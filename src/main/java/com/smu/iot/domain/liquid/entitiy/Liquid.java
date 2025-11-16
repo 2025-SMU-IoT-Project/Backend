@@ -31,6 +31,12 @@ public class Liquid {
     // 4kg 초과(혹은 80% 이상 찼는지) 여부
     private Boolean overloaded = false;
 
+    @Column(name = "uuid", nullable = false, length = 36)
+    private String uuid;
+
+    @Column(name = "last_uuid", length = 36)
+    private String lastUuid;
+
     @OneToOne
     @JoinColumn(name = "bin_id")
     private Bin bin;

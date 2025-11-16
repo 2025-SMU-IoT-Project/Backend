@@ -3,20 +3,23 @@ package com.smu.iot.domain.liquid.service.impl;
 import com.smu.iot.domain.bin.code.BinErrorCode;
 import com.smu.iot.domain.bin.entity.Bin;
 import com.smu.iot.domain.bin.repository.BinRepository;
+import com.smu.iot.domain.event.entity.Event;
+import com.smu.iot.domain.event.repository.EventRepository;
 import com.smu.iot.domain.liquid.code.LiquidErrorCode;
 import com.smu.iot.domain.liquid.converter.LiquidConverter;
 import com.smu.iot.domain.liquid.dto.request.LiquidRequestDTO;
 import com.smu.iot.domain.liquid.dto.response.LiquidResponseDTO;
 import com.smu.iot.domain.liquid.entitiy.Liquid;
 import com.smu.iot.domain.liquid.entitiy.LiquidHistory;
+import com.smu.iot.domain.liquid.entitiy.PeriodType;
+import com.smu.iot.domain.liquid.entitiy.TrendMode;
 import com.smu.iot.domain.liquid.repository.LiquidHistoryRepository;
 import com.smu.iot.domain.liquid.repository.LiquidRepository;
 import com.smu.iot.domain.liquid.service.LiquidService;
-import com.smu.iot.domain.liquid.entitiy.PeriodType;
-import com.smu.iot.domain.liquid.entitiy.TrendMode;
 import com.smu.iot.global.apipayload.exception.handler.BinHandler;
 import com.smu.iot.global.apipayload.exception.handler.LiquidHandler;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,6 +28,7 @@ import java.time.LocalDateTime;
 import java.time.temporal.WeekFields;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 @Transactional
@@ -32,6 +36,7 @@ public class LiquidServiceImpl implements LiquidService {
     private final LiquidRepository liquidRepository;
     private final BinRepository binRepository;
     private final LiquidHistoryRepository liquidHistoryRepository;
+    private final EventRepository eventRepository;
 
     @Override
     public Liquid createLiquid(Long binId, LiquidRequestDTO.CreateLiquidDTO createLiquidDTO) {
@@ -69,15 +74,14 @@ public class LiquidServiceImpl implements LiquidService {
         List<Liquid> liquids = liquidRepository.findAll();
 
         List<LiquidResponseDTO.LiquidPreviewDTO> items = liquids.stream()
-                .map(LiquidConverter::toLiquidPreviewDTO)
-                .toList();
+            .map(LiquidConverter::toLiquidPreviewDTO)
+            .toList();
 
-        // 전체 물통 평균 무게 계산
         double averageWeight = items.isEmpty() ? 0.0 :
-                items.stream()
-                        .mapToDouble(LiquidResponseDTO.LiquidPreviewDTO::getWeight)
-                        .average()
-                        .orElse(0.0);
+            items.stream()
+                .mapToDouble(LiquidResponseDTO.LiquidPreviewDTO::getWeight)
+                .average()
+                .orElse(0.0);
 
         return LiquidConverter.toLiquidPreviewListWithAverageDTO(liquids, averageWeight);
     }
@@ -96,7 +100,10 @@ public class LiquidServiceImpl implements LiquidService {
         updateLiquidWeight(liquid, updateLiquidDTO.getWeight());
 
         // LiquidHistory 기록 추가
-        addLiquidHistory(liquid);
+        addLiquidHistory(liquid, updateLiquidDTO.getUuid());
+
+        // Event 업데이트
+        updateMainEvent(updateLiquidDTO.getUuid(), liquid);
 
         return liquid;
     }
@@ -111,7 +118,10 @@ public class LiquidServiceImpl implements LiquidService {
         updateLiquidWeight(liquid, updateLiquidDTO.getWeight());
 
         // LiquidHistory 기록 추가
-        addLiquidHistory(liquid);
+        addLiquidHistory(liquid, updateLiquidDTO.getUuid());
+
+        // Event 업데이트
+        updateMainEvent(updateLiquidDTO.getUuid(), liquid);
 
         return liquid;
     }
@@ -137,10 +147,7 @@ public class LiquidServiceImpl implements LiquidService {
             throw new BinHandler(BinErrorCode._NOT_FOUND_BIN);
         });
 
-        // period에 맞는 liquid 리스트 찾기
         List<LiquidHistory> histories = findLiquidsByDate(binId, period, date);
-
-        // Converter에서 mode에 따라 변환
         return LiquidConverter.toLiquidTrendDTO(binId, histories, period, mode);
     }
 
@@ -151,36 +158,48 @@ public class LiquidServiceImpl implements LiquidService {
         });
 
         Long binId = liquid.getBin().getId();
-        // period에 맞는 liquid 리스트 찾기
         List<LiquidHistory> histories = findLiquidsByDate(binId, period, date);
-
-        // Converter에서 mode에 따라 변환
         return LiquidConverter.toLiquidTrendDTO(binId, histories, period, mode);
     }
 
     public void updateLiquidWeight(Liquid liquid, double newWeight) {
-        // addedWeight 업데이트
         double oldWeight = liquid.getWeight();
-        double addedWeight = (newWeight > oldWeight) ? newWeight-oldWeight: 0;
-
-        // overloaded 업데이트
+        double addedWeight = (newWeight > oldWeight) ? newWeight - oldWeight : 0;
         Boolean overloaded = (newWeight >= 4000);
 
-        // liquid 업데이트
         liquid.update(newWeight, addedWeight, overloaded, LocalDateTime.now());
     }
 
-    public void addLiquidHistory(Liquid liquid) {
+    public void addLiquidHistory(Liquid liquid, String uuid) {
         LiquidHistory history = LiquidHistory.builder()
-                .bin(liquid.getBin())
-                .liquid(liquid)
-                .weight(liquid.getWeight())
-                .addedWeight(liquid.getAddedWeight())
-                .overload(liquid.getOverloaded())
-                .measuredAt(LocalDateTime.now())
-                .build();
+            .bin(liquid.getBin())
+            .liquid(liquid)
+            .weight(liquid.getWeight())
+            .addedWeight(liquid.getAddedWeight())
+            .overload(liquid.getOverloaded())
+            .measuredAt(LocalDateTime.now())
+            .uuid(uuid)
+            .build();
 
         liquidHistoryRepository.save(history);
+    }
+
+    // 이벤트 업데이트
+    private void updateMainEvent(String uuid, Liquid liquid) {
+        if (uuid == null || uuid.isEmpty()) {
+            log.warn("UUID is null or empty, skipping event update");
+            return;
+        }
+
+        eventRepository.findByUuid(uuid).ifPresent(event -> {
+            event.linkLiquidData(liquid);
+            event.setStatus(Event.EventStatus.LIQUID_MEASURING);
+
+            eventRepository.save(event);
+
+            log.info("Main Event updated with Liquid data - UUID: {}, EventId: {}",
+                uuid, event.getId());
+        });
     }
 
     public List<LiquidHistory> findLiquidsByDate(Long binId, PeriodType period, LocalDate date) {
@@ -188,7 +207,6 @@ public class LiquidServiceImpl implements LiquidService {
             date = LocalDate.now();
         }
 
-        // period에 따라 조회 기간(start, end) 계산
         LocalDateTime start;
         LocalDateTime end;
 
@@ -211,8 +229,6 @@ public class LiquidServiceImpl implements LiquidService {
             default -> throw new IllegalArgumentException("Unsupported period: " + period);
         }
 
-        // 기간 내 LiquidHistory 조회
         return liquidHistoryRepository.findByBinIdAndMeasuredAtBetweenOrderByMeasuredAtAsc(binId, start, end);
     }
 }
-

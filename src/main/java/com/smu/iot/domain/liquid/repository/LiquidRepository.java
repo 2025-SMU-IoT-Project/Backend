@@ -12,4 +12,6 @@ public interface LiquidRepository extends JpaRepository<Liquid, Long> {
     Optional<Liquid> findByBin(Bin bin);
 
     List<Liquid> findAllByOverloaded(Boolean overloaded);
+
+    Optional<Liquid> findByUuid(String uuid);
 }

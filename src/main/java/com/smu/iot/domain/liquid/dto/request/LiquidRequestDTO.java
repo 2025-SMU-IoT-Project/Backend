@@ -12,5 +12,6 @@ public class LiquidRequestDTO {
     @Getter
     public static class UpdateLiquidDTO {
         private double weight;
+        private String uuid;
     }
 }
