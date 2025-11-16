@@ -33,25 +33,15 @@ public class EventService {
         return convertToDetailDTO(event);
     }
 
-    // Mock: 최근 이벤트 목록 조회
     public List<EventSummaryDTO> getRecentEvents(Long binId, int limit) {
-        List<EventSummaryDTO> events = new ArrayList<>();
+        log.info("Querying recent events - binId: {}, limit: {}", binId, limit);
 
-        for (int i = 0; i < Math.min(limit, 20); i++) {
-            boolean hasLiquid = i % 4 == 0; // 4개 중 1개는 액체 포함
+        List<Event> events = eventRepository.findByBin_IdOrderByCreatedAtDesc(binId);
 
-            events.add(EventSummaryDTO.builder()
-                .uuid("550e8400-e29b-41d4-a716-" + String.format("%012d", i))
-                .binId(binId)
-                .timestamp(LocalDateTime.now().minusMinutes(i * 10))
-                .isValidInput(true)
-                .hasLiquid(hasLiquid)
-                .cupType(hasLiquid ? "LIQUID_CUP" : "EMPTY_CUP")
-                .cupPattern("NORMAL_CUP")
-                .build());
-        }
-
-        return events;
+        return events.stream()
+            .limit(limit)
+            .map(this::convertToSummaryDTO)
+            .collect(Collectors.toList());
     }
 
     // Mock: 날짜 범위로 이벤트 조회
@@ -172,6 +162,31 @@ public class EventService {
             .eventStatus(event.getStatus().name())
             .sensors(sensorDataDTO)
             .summary(summaryDTO)
+            .build();
+    }
+
+    private EventSummaryDTO convertToSummaryDTO(Event event) {
+        String cupType = "UNKNOWN";
+        String cupPattern = "UNKNOWN";
+
+        // 로드셀 데이터가 있으면 cupType 설정
+        if (event.getHasCupData() && event.getCupData() != null) {
+            cupType = event.getCupData().getCupType().name();
+        }
+
+        // 레이저 데이터가 있으면 cupPattern 설정
+        if (event.getHasLaserData() && event.getLaserData() != null) {
+            cupPattern = event.getLaserData().getPatternType().name();
+        }
+
+        return EventSummaryDTO.builder()
+            .uuid(event.getUuid())
+            .binId(event.getBinId())
+            .timestamp(event.getCreatedAt())
+            .isValidInput(event.getIsValidInput())
+            .hasLiquid(event.getHasLiquid())
+            .cupType(cupType)
+            .cupPattern(cupPattern)
             .build();
     }
 }
