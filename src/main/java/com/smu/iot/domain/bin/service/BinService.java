@@ -2,7 +2,14 @@ package com.smu.iot.domain.bin.service;
 
 import com.smu.iot.domain.bin.dto.request.BinCreateRequestDTO;
 import com.smu.iot.domain.bin.dto.request.BinUpdateRequestDTO;
-import com.smu.iot.domain.bin.dto.response.*;
+import com.smu.iot.domain.bin.dto.response.BinCollectionDTO;
+import com.smu.iot.domain.bin.dto.response.BinDetailDTO;
+import com.smu.iot.domain.bin.dto.response.BinListDTO;
+import com.smu.iot.domain.bin.dto.response.BinStatusDTO;
+import com.smu.iot.domain.bin.entity.Bin;
+import com.smu.iot.domain.bin.repository.BinRepository;
+import com.smu.iot.global.apipayload.code.GeneralErrorCode;
+import com.smu.iot.global.apipayload.exception.GeneralException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,32 +24,43 @@ import java.util.List;
 @RequiredArgsConstructor
 public class BinService {
 
-    // Mock: 쓰레기통 상세 정보 조회
+    private final BinRepository binRepository;
+
     public BinDetailDTO getBinDetail(Long binId) {
+
+        Bin bin = binRepository.findById(binId)
+            .orElseThrow(() -> new GeneralException(GeneralErrorCode.NOT_FOUND_404));
+
+        BinDetailDTO.LocationDTO locationDTO = BinDetailDTO.LocationDTO.builder()
+            .building(bin.getBuilding())
+            .floor(bin.getFloor())
+            .room(bin.getRoom())
+            .latitude(bin.getLatitude())
+            .longitude(bin.getLongitude())
+            .address(bin.getAddress())
+            .build();
+
+        BinDetailDTO.SpecificationDTO specificationDTO = BinDetailDTO.SpecificationDTO.builder()
+            .capacity(bin.getCapacity())
+            .heightCm(bin.getHeightCm())
+            .widthMm(bin.getWidthMm())
+            .maxWeight(bin.getMaxWeight())
+            .build();
+
+        BinDetailDTO.StatusDTO statusDTO = BinDetailDTO.StatusDTO.builder()
+            .isActive(bin.getIsActive())
+            .isOnline(bin.getIsOnline())
+            .lastHeartbeat(bin.getUpdatedAt())
+            .installDate(bin.getCreatedAt().toLocalDate())
+            .build();
+
         return BinDetailDTO.builder()
-            .binId(binId)
-            .binName("공학관 1층 쓰레기통")
-            .binCode("BIN-001")
-            .location(BinDetailDTO.LocationDTO.builder()
-                .building("공학관")
-                .floor(1)
-                .room("계단 앞")
-                .latitude(37.5665)
-                .longitude(126.9780)
-                .address("서울시 종로구 ...")
-                .build())
-            .specifications(BinDetailDTO.SpecificationDTO.builder()
-                .capacity(50.0)
-                .heightCm(50.0)
-                .widthMm(150.0)
-                .maxWeight(5000.0)
-                .build())
-            .status(BinDetailDTO.StatusDTO.builder()
-                .isActive(true)
-                .isOnline(true)
-                .lastHeartbeat(LocalDateTime.now())
-                .installDate(LocalDate.of(2025, 10, 1))
-                .build())
+            .binId(bin.getId())
+            .binName(bin.getName())
+            .binCode(bin.getBinCode())
+            .location(locationDTO)
+            .specifications(specificationDTO)
+            .status(statusDTO)
             .build();
     }
 
@@ -91,7 +109,7 @@ public class BinService {
     // Mock: 전체 쓰레기통 목록 조회
     public List<BinListDTO> getAllBins(Boolean includeStatus) {
         List<BinListDTO> bins = new ArrayList<>();
-        
+
         for (int i = 1; i <= 5; i++) {
             bins.add(BinListDTO.builder()
                 .binId((long) i)
@@ -109,14 +127,14 @@ public class BinService {
                     .build() : null)
                 .build());
         }
-        
+
         return bins;
     }
 
     // Mock: 수거가 필요한 쓰레기통 목록
     public BinCollectionDTO getBinsNeedingCollection(Double threshold) {
         List<BinCollectionDTO.CollectionBinDTO> bins = new ArrayList<>();
-        
+
         bins.add(BinCollectionDTO.CollectionBinDTO.builder()
             .binId(2L)
             .binName("공학관 2층 쓰레기통")
