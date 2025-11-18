@@ -7,6 +7,7 @@ import com.smu.iot.domain.bin.service.BinService;
 import com.smu.iot.global.apipayload.ApiResponse;
 import com.smu.iot.global.apipayload.code.GeneralSuccessCode;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -54,7 +55,7 @@ public class BinController {
     )
     public ApiResponse<List<BinListDTO>> getAllBins(
         @RequestParam(defaultValue = "true") Boolean includeStatus) {
-        
+
         log.info("Querying all bins - includeStatus: {}", includeStatus);
 
         List<BinListDTO> bins = binService.getAllBins(includeStatus);
@@ -68,7 +69,7 @@ public class BinController {
     )
     public ApiResponse<BinCollectionDTO> getBinsNeedingCollection(
         @RequestParam(defaultValue = "80") Double threshold) {
-        
+
         log.info("Querying bins needing collection - threshold: {}", threshold);
 
         BinCollectionDTO result = binService.getBinsNeedingCollection(threshold);
@@ -95,7 +96,7 @@ public class BinController {
     public ApiResponse<BinInfoDTO> updateBin(
         @PathVariable Long binId,
         @RequestBody BinUpdateRequestDTO request) {
-        
+
         log.info("Updating bin - binId: {}", binId);
 
         BinInfoDTO result = binService.updateBin(binId, request);
@@ -125,5 +126,41 @@ public class BinController {
         log.info("Querying detail stats for binId: {}", binId);
         BinDetailDTO stats = binService.getBinDetail(binId);
         return ApiResponse.onSuccess(GeneralSuccessCode.OK, stats);
+    }
+
+    @GetMapping("/{binId}/trend/cup")
+    @Operation(
+        summary = "컵 투입 트렌드 조회",
+        description = "특정 쓰레기통의 컵 투입 횟수 추이를 조회합니다. (옵션: 일간/월간)"
+    )
+    public ApiResponse<BinTrendResponseDTO> getCupTrend(
+        @PathVariable Long binId,
+        @Parameter(description = "조회 기간 타입 (daily, monthly)")
+        @RequestParam(defaultValue = "daily") String period,
+        @Parameter(description = "조회 날짜 (yyyy-MM-dd 또는 yyyy-MM)")
+        @RequestParam(required = false) String date) {
+
+        log.info("Querying cup trend - binId: {}, period: {}, date: {}", binId, period, date);
+        BinTrendResponseDTO result = binService.getCupTrend(binId, period, date);
+
+        return ApiResponse.onSuccess(GeneralSuccessCode.OK, result);
+    }
+
+    @GetMapping("/{binId}/trend/liquid")
+    @Operation(
+        summary = "액체 무게 변화량 트렌드 조회",
+        description = "특정 쓰레기통의 액체 무게 증가량 추이를 조회합니다. (옵션: 일간/월간)"
+    )
+    public ApiResponse<BinTrendResponseDTO> getLiquidTrend(
+        @PathVariable Long binId,
+        @Parameter(description = "조회 기간 타입 (daily, monthly)")
+        @RequestParam(defaultValue = "daily") String period,
+        @Parameter(description = "조회 날짜 (yyyy-MM-dd 또는 yyyy-MM)")
+        @RequestParam(required = false) String date) {
+
+        log.info("Querying liquid trend - binId: {}, period: {}, date: {}", binId, period, date);
+        BinTrendResponseDTO result = binService.getLiquidTrend(binId, period, date);
+
+        return ApiResponse.onSuccess(GeneralSuccessCode.OK, result);
     }
 }

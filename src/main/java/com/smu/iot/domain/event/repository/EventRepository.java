@@ -35,4 +35,6 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     long countByBin_Id(Long binId);
 
     long countByBin_IdAndIsValidInputFalse(Long binId);
+
+    List<Event> findByBin_IdAndCreatedAtBetween(Long binId, LocalDateTime start, LocalDateTime end);
 }

@@ -7,6 +7,8 @@ import com.smu.iot.domain.bin.entity.Bin;
 import com.smu.iot.domain.bin.repository.BinRepository;
 import com.smu.iot.domain.event.entity.Event;
 import com.smu.iot.domain.event.repository.EventRepository;
+import com.smu.iot.domain.liquid.entitiy.LiquidHistory;
+import com.smu.iot.domain.liquid.repository.LiquidHistoryRepository;
 import com.smu.iot.domain.liquid.repository.LiquidRepository;
 import com.smu.iot.domain.loadcell.repository.BinWeightRepository;
 import com.smu.iot.domain.ultrasonic.entity.Ultrasonic;
@@ -19,6 +21,8 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -32,6 +36,7 @@ public class BinService {
     private final UltrasonicRepository ultrasonicRepository;
     private final BinWeightRepository binWeightRepository;
     private final LiquidRepository liquidRepository;
+    private final LiquidHistoryRepository liquidHistoryRepository;
 
     public BinInfoDTO getBinInfo(Long binId) {
 
@@ -346,6 +351,116 @@ public class BinService {
             .cupWeight(Math.round(cupWeightKg * 10) / 10.0)
             .liquidWeight(Math.round(liquidWeightKg * 10) / 10.0)
             .liquidRate(Math.round(liquidRate * 10) / 10.0)
+            .build();
+    }
+
+    public BinTrendResponseDTO getCupTrend(Long binId, String period, String dateStr) {
+        List<BinTrendResponseDTO.TrendPoint> points = new ArrayList<>();
+
+        if ("MONTHLY".equalsIgnoreCase(period)) {
+            if (dateStr == null) dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
+            YearMonth yearMonth = YearMonth.parse(dateStr);
+
+            LocalDateTime start = yearMonth.atDay(1).atStartOfDay();
+            LocalDateTime end = yearMonth.atEndOfMonth().atTime(23, 59, 59);
+
+            // 해당 월 데이터 조회
+            List<Event> events = eventRepository.findByBin_IdAndCreatedAtBetween(binId, start, end);
+            DateTimeFormatter labelFormatter = DateTimeFormatter.ofPattern("MM-dd");
+
+            // 1일 ~ 말일
+            for (int day = 1; day <= yearMonth.lengthOfMonth(); day++) {
+                int currentDay = day;
+                long count = events.stream()
+                    .filter(e -> e.getCreatedAt().getDayOfMonth() == currentDay)
+                    .count();
+
+                points.add(new BinTrendResponseDTO.TrendPoint(
+                    yearMonth.atDay(day).format(labelFormatter), (double) count));
+            }
+
+        } else {
+            LocalDate date = (dateStr == null) ? LocalDate.now() : LocalDate.parse(dateStr);
+            LocalDateTime start = date.atStartOfDay();
+            LocalDateTime end = date.atTime(23, 59, 59);
+
+            // 해당 일 데이터 조회
+            List<Event> events = eventRepository.findByBin_IdAndCreatedAtBetween(binId, start, end);
+
+            // 0시 ~ 23시
+            for (int hour = 0; hour < 24; hour++) {
+                int currentHour = hour;
+                long count = events.stream()
+                    .filter(e -> e.getCreatedAt().getHour() == currentHour)
+                    .count();
+
+                points.add(new BinTrendResponseDTO.TrendPoint(
+                    String.format("%02d:00", hour), (double) count));
+            }
+            dateStr = date.toString();
+        }
+
+        return BinTrendResponseDTO.builder()
+            .binId(binId)
+            .type("CUP")
+            .period(period.toUpperCase())
+            .baseDate(dateStr)
+            .trends(points)
+            .build();
+    }
+
+    public BinTrendResponseDTO getLiquidTrend(Long binId, String period, String dateStr) {
+        List<BinTrendResponseDTO.TrendPoint> points = new ArrayList<>();
+
+        if ("MONTHLY".equalsIgnoreCase(period)) {
+            if (dateStr == null) dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
+            YearMonth yearMonth = YearMonth.parse(dateStr);
+
+            LocalDateTime start = yearMonth.atDay(1).atStartOfDay();
+            LocalDateTime end = yearMonth.atEndOfMonth().atTime(23, 59, 59);
+
+            List<LiquidHistory> liquids = liquidHistoryRepository
+                .findByBinIdAndMeasuredAtBetweenOrderByMeasuredAtAsc(binId, start, end);
+            DateTimeFormatter labelFormatter = DateTimeFormatter.ofPattern("dd");
+
+            for (int day = 1; day <= yearMonth.lengthOfMonth(); day++) {
+                int currentDay = day;
+                double weightSum = liquids.stream()
+                    .filter(l -> l.getMeasuredAt().getDayOfMonth() == currentDay)
+                    .mapToDouble(LiquidHistory::getAddedWeight)
+                    .sum();
+
+                points.add(new BinTrendResponseDTO.TrendPoint(
+                    yearMonth.atDay(day).format(labelFormatter), weightSum));
+            }
+
+        } else {
+            LocalDate date = (dateStr == null) ? LocalDate.now() : LocalDate.parse(dateStr);
+            LocalDateTime start = date.atStartOfDay();
+            LocalDateTime end = date.atTime(23, 59, 59);
+
+            List<LiquidHistory> liquids = liquidHistoryRepository
+                .findByBinIdAndMeasuredAtBetweenOrderByMeasuredAtAsc(binId, start, end);
+
+            for (int hour = 0; hour < 24; hour++) {
+                int currentHour = hour;
+                double weightSum = liquids.stream()
+                    .filter(l -> l.getMeasuredAt().getHour() == currentHour)
+                    .mapToDouble(LiquidHistory::getAddedWeight)
+                    .sum();
+
+                points.add(new BinTrendResponseDTO.TrendPoint(
+                    String.format("%02d", hour), weightSum));
+            }
+            dateStr = date.toString();
+        }
+
+        return BinTrendResponseDTO.builder()
+            .binId(binId)
+            .type("LIQUID")
+            .period(period.toUpperCase())
+            .baseDate(dateStr)
+            .trends(points)
             .build();
     }
 }
