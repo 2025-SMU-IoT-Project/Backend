@@ -2,12 +2,13 @@ package com.smu.iot.domain.bin.service;
 
 import com.smu.iot.domain.bin.dto.request.BinCreateRequestDTO;
 import com.smu.iot.domain.bin.dto.request.BinUpdateRequestDTO;
-import com.smu.iot.domain.bin.dto.response.BinCollectionDTO;
-import com.smu.iot.domain.bin.dto.response.BinDetailDTO;
-import com.smu.iot.domain.bin.dto.response.BinListDTO;
-import com.smu.iot.domain.bin.dto.response.BinStatusDTO;
+import com.smu.iot.domain.bin.dto.response.*;
 import com.smu.iot.domain.bin.entity.Bin;
 import com.smu.iot.domain.bin.repository.BinRepository;
+import com.smu.iot.domain.event.entity.Event;
+import com.smu.iot.domain.event.repository.EventRepository;
+import com.smu.iot.domain.ultrasonic.entity.Ultrasonic;
+import com.smu.iot.domain.ultrasonic.repository.UltrasonicRepository;
 import com.smu.iot.global.apipayload.code.GeneralErrorCode;
 import com.smu.iot.global.apipayload.exception.GeneralException;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,8 @@ import java.util.List;
 public class BinService {
 
     private final BinRepository binRepository;
+    private final EventRepository eventRepository;
+    private final UltrasonicRepository ultrasonicRepository;
 
     public BinDetailDTO getBinDetail(Long binId) {
 
@@ -231,5 +234,74 @@ public class BinService {
                 .installDate(LocalDate.of(2025, 10, 1))
                 .build())
             .build();
+    }
+
+    public BinGlobalStatsDTO getBinGlobalStats(String period) {
+        LocalDateTime end = LocalDateTime.now();
+        LocalDateTime start = calculateStartDate(period);
+
+        // 해당 기간의 전체 이벤트 조회
+        List<Event> events = eventRepository.findAllByDateRange(start, end);
+
+        long totalCups = events.size();
+
+        // Event 엔티티의 필드를 사용하여 집계
+        long liquidCups = events.stream()
+            .filter(Event::getHasLiquid)
+            .count();
+
+        // isValidInput이 false인 경우를 비정상 투입으로 간주
+        long abnormalCount = events.stream()
+            .filter(e -> !e.getIsValidInput())
+            .count();
+
+        double liquidRate = totalCups > 0
+            ? (double) liquidCups / totalCups * 100.0
+            : 0.0;
+
+        // 전체 쓰레기통의 최근 채움률 평균 계산
+        List<Bin> allBins = binRepository.findAll();
+        List<Double> recentFillRates = new ArrayList<>();
+
+        for (Bin bin : allBins) {
+            // 해당 기간 내의 최신 데이터를 조회
+            List<Ultrasonic> recentData = ultrasonicRepository
+                .findTop5ByBinIdAndCreatedAtBetweenOrderByCreatedAtDesc(bin.getId(), start, end);
+
+            // 만약 기간 내 데이터가 없다면, 기간 상관없이 가장 최근 데이터를 조회
+            if (recentData.isEmpty()) {
+                recentData = ultrasonicRepository.findTop5ByBinIdOrderByCreatedAtDesc(bin.getId());
+            }
+
+            // 데이터 수집
+            for (Ultrasonic u : recentData) {
+                recentFillRates.add(u.getFillRate());
+            }
+        }
+
+        // 수집된 데이터들의 평균 계산
+        double averageFillRate = recentFillRates.stream()
+            .mapToDouble(Double::doubleValue)
+            .average()
+            .orElse(0.0);
+
+        return BinGlobalStatsDTO.builder()
+            .totalCups(totalCups)
+            .liquidRate(Math.round(liquidRate * 10) / 10.0)
+            .abnormalCount(abnormalCount)
+            .averageFillRate(Math.round(averageFillRate * 10) / 10.0)
+            .period(period.toUpperCase())
+            .build();
+    }
+
+    private LocalDateTime calculateStartDate(String period) {
+        LocalDate today = LocalDate.now();
+
+        return switch (period.toUpperCase()) {
+            case "WEEKLY" -> today.minusWeeks(1).atStartOfDay();
+            case "MONTHLY" -> today.minusMonths(1).atStartOfDay();
+            case "DAILY" -> today.atStartOfDay();
+            default -> today.atStartOfDay();
+        };
     }
 }

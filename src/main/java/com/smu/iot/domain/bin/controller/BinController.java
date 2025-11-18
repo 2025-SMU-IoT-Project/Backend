@@ -101,4 +101,18 @@ public class BinController {
         BinDetailDTO result = binService.updateBin(binId, request);
         return ApiResponse.onSuccess(GeneralSuccessCode.OK, result);
     }
+
+    @GetMapping("/stats")
+    @Operation(
+        summary = "전체 쓰레기통 기간별 통계 조회",
+        description = "모든 쓰레기통의 컵 투입량, 액체 비율, 비정상 투입, 평균 채움률 통계를 조회합니다. (기간: daily, weekly, monthly)"
+    )
+    public ApiResponse<BinGlobalStatsDTO> getBinGlobalStats(
+        @RequestParam(defaultValue = "daily") String period) {
+
+        log.info("Querying global bin stats - period: {}", period);
+
+        BinGlobalStatsDTO stats = binService.getBinGlobalStats(period);
+        return ApiResponse.onSuccess(GeneralSuccessCode.OK, stats);
+    }
 }
