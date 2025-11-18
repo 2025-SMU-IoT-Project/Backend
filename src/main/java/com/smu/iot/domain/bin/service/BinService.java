@@ -52,6 +52,7 @@ public class BinService {
             .isOnline(bin.getIsOnline())
             .lastHeartbeat(bin.getUpdatedAt())
             .installDate(bin.getCreatedAt().toLocalDate())
+            .fillStatus(bin.getStatus())
             .build();
 
         return BinDetailDTO.builder()
@@ -66,6 +67,10 @@ public class BinService {
 
     // Mock: 쓰레기통 현재 상태 조회
     public BinStatusDTO getBinStatus(Long binId) {
+        Bin bin = binRepository.findById(binId)
+            .orElseThrow(() -> new GeneralException(GeneralErrorCode.NOT_FOUND_404));
+
+
         return BinStatusDTO.builder()
             .binId(binId)
             .binName("공학관 1층 쓰레기통")

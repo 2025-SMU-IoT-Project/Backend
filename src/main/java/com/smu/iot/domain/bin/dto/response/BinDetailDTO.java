@@ -1,5 +1,6 @@
 package com.smu.iot.domain.bin.dto.response;
 
+import com.smu.iot.domain.bin.entity.Bin;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -53,5 +54,6 @@ public class BinDetailDTO {
         private Boolean isOnline;
         private LocalDateTime lastHeartbeat;
         private LocalDate installDate;
+        private Bin.BinStatus fillStatus;
     }
 }
