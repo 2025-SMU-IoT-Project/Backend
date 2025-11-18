@@ -28,10 +28,10 @@ public class BinController {
         summary = "쓰레기통 기본 정보 조회",
         description = "특정 쓰레기통의 상세 정보를 조회"
     )
-    public ApiResponse<BinDetailDTO> getBinDetail(@PathVariable Long binId) {
+    public ApiResponse<BinInfoDTO> getBinInfo(@PathVariable Long binId) {
         log.info("Querying bin detail - binId: {}", binId);
 
-        BinDetailDTO detail = binService.getBinDetail(binId);
+        BinInfoDTO detail = binService.getBinInfo(binId);
         return ApiResponse.onSuccess(GeneralSuccessCode.OK, detail);
     }
 
@@ -80,10 +80,10 @@ public class BinController {
         summary = "쓰레기통 등록",
         description = "새로운 쓰레기통을 등록"
     )
-    public ApiResponse<BinDetailDTO> createBin(@RequestBody BinCreateRequestDTO request) {
+    public ApiResponse<BinInfoDTO> createBin(@RequestBody BinCreateRequestDTO request) {
         log.info("Creating new bin - binCode: {}", request.getBinCode());
 
-        BinDetailDTO result = binService.createBin(request);
+        BinInfoDTO result = binService.createBin(request);
         return ApiResponse.onSuccess(GeneralSuccessCode.CREATED, result);
     }
 
@@ -92,13 +92,13 @@ public class BinController {
         summary = "쓰레기통 정보 수정",
         description = "기존 쓰레기통의 정보를 수정"
     )
-    public ApiResponse<BinDetailDTO> updateBin(
+    public ApiResponse<BinInfoDTO> updateBin(
         @PathVariable Long binId,
         @RequestBody BinUpdateRequestDTO request) {
         
         log.info("Updating bin - binId: {}", binId);
 
-        BinDetailDTO result = binService.updateBin(binId, request);
+        BinInfoDTO result = binService.updateBin(binId, request);
         return ApiResponse.onSuccess(GeneralSuccessCode.OK, result);
     }
 
@@ -113,6 +113,17 @@ public class BinController {
         log.info("Querying global bin stats - period: {}", period);
 
         BinGlobalStatsDTO stats = binService.getBinGlobalStats(period);
+        return ApiResponse.onSuccess(GeneralSuccessCode.OK, stats);
+    }
+
+    @GetMapping("detail/{binId}")
+    @Operation(
+        summary = "특정 쓰레기통 상세 조회",
+        description = "특정 쓰레기통의 컵 투입 횟수, 비정상 투입 횟수, 현재 무게(kg), 액체 채움률 등을 조회합니다."
+    )
+    public ApiResponse<BinDetailDTO> getBinDetail(@PathVariable Long binId) {
+        log.info("Querying detail stats for binId: {}", binId);
+        BinDetailDTO stats = binService.getBinDetail(binId);
         return ApiResponse.onSuccess(GeneralSuccessCode.OK, stats);
     }
 }

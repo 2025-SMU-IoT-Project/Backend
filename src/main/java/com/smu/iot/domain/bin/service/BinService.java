@@ -7,6 +7,8 @@ import com.smu.iot.domain.bin.entity.Bin;
 import com.smu.iot.domain.bin.repository.BinRepository;
 import com.smu.iot.domain.event.entity.Event;
 import com.smu.iot.domain.event.repository.EventRepository;
+import com.smu.iot.domain.liquid.repository.LiquidRepository;
+import com.smu.iot.domain.loadcell.repository.BinWeightRepository;
 import com.smu.iot.domain.ultrasonic.entity.Ultrasonic;
 import com.smu.iot.domain.ultrasonic.repository.UltrasonicRepository;
 import com.smu.iot.global.apipayload.code.GeneralErrorCode;
@@ -28,13 +30,15 @@ public class BinService {
     private final BinRepository binRepository;
     private final EventRepository eventRepository;
     private final UltrasonicRepository ultrasonicRepository;
+    private final BinWeightRepository binWeightRepository;
+    private final LiquidRepository liquidRepository;
 
-    public BinDetailDTO getBinDetail(Long binId) {
+    public BinInfoDTO getBinInfo(Long binId) {
 
         Bin bin = binRepository.findById(binId)
             .orElseThrow(() -> new GeneralException(GeneralErrorCode.NOT_FOUND_404));
 
-        BinDetailDTO.LocationDTO locationDTO = BinDetailDTO.LocationDTO.builder()
+        BinInfoDTO.LocationDTO locationDTO = BinInfoDTO.LocationDTO.builder()
             .building(bin.getBuilding())
             .floor(bin.getFloor())
             .room(bin.getRoom())
@@ -43,14 +47,14 @@ public class BinService {
             .address(bin.getAddress())
             .build();
 
-        BinDetailDTO.SpecificationDTO specificationDTO = BinDetailDTO.SpecificationDTO.builder()
+        BinInfoDTO.SpecificationDTO specificationDTO = BinInfoDTO.SpecificationDTO.builder()
             .capacity(bin.getCapacity())
             .heightCm(bin.getHeightCm())
             .widthMm(bin.getWidthMm())
             .maxWeight(bin.getMaxWeight())
             .build();
 
-        BinDetailDTO.StatusDTO statusDTO = BinDetailDTO.StatusDTO.builder()
+        BinInfoDTO.StatusDTO statusDTO = BinInfoDTO.StatusDTO.builder()
             .isActive(bin.getIsActive())
             .isOnline(bin.getIsOnline())
             .lastHeartbeat(bin.getUpdatedAt())
@@ -58,7 +62,7 @@ public class BinService {
             .fillStatus(bin.getStatus())
             .build();
 
-        return BinDetailDTO.builder()
+        return BinInfoDTO.builder()
             .binId(bin.getId())
             .binName(bin.getName())
             .binCode(bin.getBinCode())
@@ -179,12 +183,12 @@ public class BinService {
     }
 
     // Mock: 쓰레기통 생성
-    public BinDetailDTO createBin(BinCreateRequestDTO request) {
-        return BinDetailDTO.builder()
+    public BinInfoDTO createBin(BinCreateRequestDTO request) {
+        return BinInfoDTO.builder()
             .binId(99L)
             .binName(request.getBinName())
             .binCode(request.getBinCode())
-            .location(BinDetailDTO.LocationDTO.builder()
+            .location(BinInfoDTO.LocationDTO.builder()
                 .building(request.getLocation().getBuilding())
                 .floor(request.getLocation().getFloor())
                 .room(request.getLocation().getRoom())
@@ -192,13 +196,13 @@ public class BinService {
                 .longitude(request.getLocation().getLongitude())
                 .address(request.getLocation().getAddress())
                 .build())
-            .specifications(BinDetailDTO.SpecificationDTO.builder()
+            .specifications(BinInfoDTO.SpecificationDTO.builder()
                 .capacity(request.getSpecifications().getCapacity())
                 .heightCm(request.getSpecifications().getHeightCm())
                 .widthMm(request.getSpecifications().getWidthMm())
                 .maxWeight(request.getSpecifications().getMaxWeight())
                 .build())
-            .status(BinDetailDTO.StatusDTO.builder()
+            .status(BinInfoDTO.StatusDTO.builder()
                 .isActive(true)
                 .isOnline(false)
                 .lastHeartbeat(null)
@@ -208,12 +212,12 @@ public class BinService {
     }
 
     // Mock: 쓰레기통 수정
-    public BinDetailDTO updateBin(Long binId, BinUpdateRequestDTO request) {
-        return BinDetailDTO.builder()
+    public BinInfoDTO updateBin(Long binId, BinUpdateRequestDTO request) {
+        return BinInfoDTO.builder()
             .binId(binId)
             .binName(request.getBinName())
             .binCode("BIN-001")
-            .location(BinDetailDTO.LocationDTO.builder()
+            .location(BinInfoDTO.LocationDTO.builder()
                 .building(request.getLocation().getBuilding())
                 .floor(request.getLocation().getFloor())
                 .room(request.getLocation().getRoom())
@@ -221,13 +225,13 @@ public class BinService {
                 .longitude(request.getLocation().getLongitude())
                 .address(request.getLocation().getAddress())
                 .build())
-            .specifications(BinDetailDTO.SpecificationDTO.builder()
+            .specifications(BinInfoDTO.SpecificationDTO.builder()
                 .capacity(request.getSpecifications().getCapacity())
                 .heightCm(request.getSpecifications().getHeightCm())
                 .widthMm(request.getSpecifications().getWidthMm())
                 .maxWeight(request.getSpecifications().getMaxWeight())
                 .build())
-            .status(BinDetailDTO.StatusDTO.builder()
+            .status(BinInfoDTO.StatusDTO.builder()
                 .isActive(true)
                 .isOnline(true)
                 .lastHeartbeat(LocalDateTime.now())
@@ -303,5 +307,45 @@ public class BinService {
             case "DAILY" -> today.atStartOfDay();
             default -> today.atStartOfDay();
         };
+    }
+
+    public BinDetailDTO getBinDetail(Long binId) {
+        // Bin 존재 여부 확인
+        Bin bin = binRepository.findById(binId)
+            .orElseThrow(() -> new GeneralException(GeneralErrorCode.NOT_FOUND_404));
+
+        // 투입 통계
+        long totalCups = eventRepository.countByBin_Id(binId);
+        long abnormalCount = eventRepository.countByBin_IdAndIsValidInputFalse(binId);
+
+        // 채움률 - 최근 5개 평균
+        List<Ultrasonic> recentUltrasonics = ultrasonicRepository.findTop5ByBinIdOrderByCreatedAtDesc(binId);
+        double fillRate = recentUltrasonics.stream()
+            .mapToDouble(Ultrasonic::getFillRate)
+            .average()
+            .orElse(0.0);
+
+        // 컵통 무게
+        double cupWeightKg = binWeightRepository.findByBinId(binId)
+            .map(bw -> bw.getCurrentWeight() / 1000.0) // 단위 kg
+            .orElse(0.0);
+
+        // 물통 무게
+        double liquidWeightKg = liquidRepository.findByBin(bin)
+            .map(l -> l.getWeight() / 1000.0) // 단위 kg
+            .orElse(0.0);
+
+        // 액체 채움률 계산
+        double liquidRate = (liquidWeightKg / 5.0) * 100.0; // 일단 물통 최대 무게가 5kg라고 가정
+
+        return BinDetailDTO.builder()
+            .binId(binId)
+            .totalCups(totalCups)
+            .abnormalCount(abnormalCount)
+            .fillRate(Math.round(fillRate * 10) / 10.0)
+            .cupWeight(Math.round(cupWeightKg * 10) / 10.0)
+            .liquidWeight(Math.round(liquidWeightKg * 10) / 10.0)
+            .liquidRate(Math.round(liquidRate * 10) / 10.0)
+            .build();
     }
 }

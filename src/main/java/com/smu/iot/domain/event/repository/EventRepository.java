@@ -31,4 +31,8 @@ public interface EventRepository extends JpaRepository<Event, Long> {
         @Param("start") LocalDateTime start,
         @Param("end") LocalDateTime end
     );
+
+    long countByBin_Id(Long binId);
+
+    long countByBin_IdAndIsValidInputFalse(Long binId);
 }
