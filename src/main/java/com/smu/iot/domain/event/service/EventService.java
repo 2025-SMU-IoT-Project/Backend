@@ -7,6 +7,7 @@ import com.smu.iot.domain.event.dto.response.EventSummaryDTO;
 import com.smu.iot.domain.event.entity.Event;
 import com.smu.iot.domain.event.repository.EventRepository;
 import com.smu.iot.domain.ir.entity.Ir;
+import com.smu.iot.domain.ir.entity.code.CupType;
 import com.smu.iot.domain.laser.entity.CupShape;
 import com.smu.iot.domain.liquid.entitiy.LiquidHistory;
 import com.smu.iot.domain.loadcell.entity.Cup;
@@ -40,6 +41,7 @@ public class EventService {
         switch (type) {
             case IR -> {
                 event.linkIrData((Ir) sensorData);
+                updateIsValidInput(event);
                 if (event.isAllSensorDataReceived()) {
                     boolean cupAccepted = event.getIsValidInput() && !event.getHasLiquid();
                     event.setCupAccepted(cupAccepted);
@@ -49,6 +51,7 @@ public class EventService {
 
             case LASER -> {
                 event.linkLaserData((CupShape) sensorData);
+                updateIsValidInput(event);
                 if (((CupShape) sensorData).getIsValidCup() != null) {
                     event.setIsValidInput(((CupShape) sensorData).getIsValidCup());
                 }
@@ -295,5 +298,36 @@ public class EventService {
 
     public enum SensorDataType {
         IR, LASER, CUP, LIQUID, ULTRASONIC
+    }
+
+    private void updateIsValidInput(Event event) {
+        // IR 센서가 플라스틱 컵으로 판정했는지 확인
+        boolean isPlasticCup = false;
+        if (event.getIrData() != null && event.getIrData().getCupType() != null) {
+            isPlasticCup = event.getIrData().getCupType() == CupType.PLASTIC;
+        }
+
+        // 레이저 센서가 유효한 컵으로 판정했는지 확인
+        boolean isValidShape = false;
+        if (event.getLaserData() != null && event.getLaserData().getIsValidCup() != null) {
+            isValidShape = event.getLaserData().getIsValidCup();
+        }
+
+        // 두 조건이 모두 만족되어야 true
+        if (event.getHasIrData() && event.getHasLaserData()) {
+            // 두 센서 데이터가 모두 있을 때만 최종 판정
+            event.setIsValidInput(isPlasticCup && isValidShape);
+
+            if (!isPlasticCup) {
+                event.setRejectionReason("종이컵은 투입할 수 없습니다.");
+            } else if (!isValidShape) {
+                event.setRejectionReason(event.getLaserData().getRejectionReason());
+            } else {
+                event.setRejectionReason(null);
+            }
+        } else {
+            // 아직 데이터가 다 모이지 않았으면 임시로 false
+            event.setIsValidInput(false);
+        }
     }
 }
