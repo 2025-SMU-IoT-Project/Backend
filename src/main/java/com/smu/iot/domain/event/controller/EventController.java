@@ -68,4 +68,20 @@ public class EventController {
             binId, startDate, endDate);
         return ApiResponse.onSuccess(GeneralSuccessCode.OK, events);
     }
+
+    @GetMapping
+    @Operation(summary = "전체 이벤트 목록 조회", description = "모든 이벤트를 조회합니다.")
+    public ApiResponse<List<EventSummaryDTO>> getAllEvents() {
+        List<EventSummaryDTO> events = eventService.getAllEvents();
+        return ApiResponse.onSuccess(GeneralSuccessCode.OK, events);
+    }
+
+    @GetMapping("/bin/{binId}")
+    @Operation(summary = "특정 쓰레기통의 이벤트 목록 조회",
+        description = "특정 binId의 모든 이벤트를 조회합니다.")
+    public ApiResponse<List<EventSummaryDTO>> getEventsByBinId(
+        @PathVariable Long binId) {
+        List<EventSummaryDTO> events = eventService.getEventsByBinId(binId);
+        return ApiResponse.onSuccess(GeneralSuccessCode.OK, events);
+    }
 }

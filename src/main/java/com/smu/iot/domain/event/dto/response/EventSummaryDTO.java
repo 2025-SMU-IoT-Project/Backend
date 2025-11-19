@@ -19,4 +19,6 @@ public class EventSummaryDTO {
     private Boolean hasLiquid;
     private String cupType;
     private String cupPattern;
+    private Boolean cupAccepted;
+    private String description;
 }

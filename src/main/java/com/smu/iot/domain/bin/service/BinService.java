@@ -252,10 +252,8 @@ public class BinService {
             .map(bw -> bw.getCurrentWeight() / 1000.0) // 단위 kg
             .orElse(0.0);
 
-        // 물통 무게
-        double liquidWeightKg = liquidRepository.findByBin(bin)
-            .map(l -> l.getWeight() / 1000.0) // 단위 kg
-            .orElse(0.0);
+        // 물통 무게 (Bin 엔티티에서 직접 조회)
+        double liquidWeightKg = (bin.getCurrentLiquidWeight() != null ? bin.getCurrentLiquidWeight() : 0.0) / 1000.0;
 
         // 액체 채움률 계산
         double liquidRate = (liquidWeightKg / 5.0) * 100.0; // 일단 물통 최대 무게가 5kg라고 가정
@@ -276,7 +274,8 @@ public class BinService {
         List<BinTrendResponseDTO.TrendPoint> points = new ArrayList<>();
 
         if ("MONTHLY".equalsIgnoreCase(period)) {
-            if (dateStr == null) dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
+            if (dateStr == null)
+                dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
             YearMonth yearMonth = YearMonth.parse(dateStr);
 
             LocalDateTime start = yearMonth.atDay(1).atStartOfDay();
@@ -331,7 +330,8 @@ public class BinService {
         List<BinTrendResponseDTO.TrendPoint> points = new ArrayList<>();
 
         if ("MONTHLY".equalsIgnoreCase(period)) {
-            if (dateStr == null) dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
+            if (dateStr == null)
+                dateStr = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM"));
             YearMonth yearMonth = YearMonth.parse(dateStr);
 
             LocalDateTime start = yearMonth.atDay(1).atStartOfDay();
