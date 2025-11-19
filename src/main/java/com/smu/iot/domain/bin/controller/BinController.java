@@ -36,18 +36,6 @@ public class BinController {
         return ApiResponse.onSuccess(GeneralSuccessCode.OK, detail);
     }
 
-    @GetMapping("/{binId}/status")
-    @Operation(
-        summary = "쓰레기통 현재 상태 조회",
-        description = "쓰레기통의 실시간 상태 정보를 조회 (채움률, 센서 상태 등)"
-    )
-    public ApiResponse<BinStatusDTO> getBinStatus(@PathVariable Long binId) {
-        log.info("Querying bin status - binId: {}", binId);
-
-        BinStatusDTO status = binService.getBinStatus(binId);
-        return ApiResponse.onSuccess(GeneralSuccessCode.OK, status);
-    }
-
     @GetMapping
     @Operation(
         summary = "전체 쓰레기통 목록 조회",
@@ -62,23 +50,9 @@ public class BinController {
         return ApiResponse.onSuccess(GeneralSuccessCode.OK, bins);
     }
 
-    @GetMapping("/needs-collection")
-    @Operation(
-        summary = "수거가 필요한 쓰레기통 목록 조회",
-        description = "채움률이 임계값을 초과한 쓰레기통 목록을 조회"
-    )
-    public ApiResponse<BinCollectionDTO> getBinsNeedingCollection(
-        @RequestParam(defaultValue = "80") Double threshold) {
-
-        log.info("Querying bins needing collection - threshold: {}", threshold);
-
-        BinCollectionDTO result = binService.getBinsNeedingCollection(threshold);
-        return ApiResponse.onSuccess(GeneralSuccessCode.OK, result);
-    }
-
     @PostMapping
     @Operation(
-        summary = "쓰레기통 등록",
+        summary = "쓰레기통 등록(Mock)",
         description = "새로운 쓰레기통을 등록"
     )
     public ApiResponse<BinInfoDTO> createBin(@RequestBody BinCreateRequestDTO request) {
@@ -90,7 +64,7 @@ public class BinController {
 
     @PutMapping("/{binId}")
     @Operation(
-        summary = "쓰레기통 정보 수정",
+        summary = "쓰레기통 정보 수정(Mock)",
         description = "기존 쓰레기통의 정보를 수정"
     )
     public ApiResponse<BinInfoDTO> updateBin(

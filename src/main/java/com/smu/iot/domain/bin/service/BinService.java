@@ -77,52 +77,6 @@ public class BinService {
             .build();
     }
 
-    // Mock: 쓰레기통 현재 상태 조회
-    public BinStatusDTO getBinStatus(Long binId) {
-        Bin bin = binRepository.findById(binId)
-            .orElseThrow(() -> new GeneralException(GeneralErrorCode.NOT_FOUND_404));
-
-
-        return BinStatusDTO.builder()
-            .binId(binId)
-            .binName("공학관 1층 쓰레기통")
-            .currentStatus(BinStatusDTO.CurrentStatusDTO.builder()
-                .fillRate(65.5)
-                .fillLevel("MEDIUM")
-                .distanceCm(17.25)
-                .totalWeight(2850.5)
-                .needsCollection(false)
-                .lastUpdated(LocalDateTime.now())
-                .build())
-            .todayStats(BinStatusDTO.TodayStatsDTO.builder()
-                .totalInputs(87)
-                .validCups(75)
-                .invalidCups(12)
-                .emptyCups(60)
-                .liquidCups(15)
-                .liquidRate(17.24)
-                .build())
-            .sensorStatus(BinStatusDTO.SensorStatusDTO.builder()
-                .irSensor(BinStatusDTO.SensorStatusDTO.SensorInfo.builder()
-                    .status("ONLINE")
-                    .lastActive(LocalDateTime.now())
-                    .build())
-                .laserSensor(BinStatusDTO.SensorStatusDTO.SensorInfo.builder()
-                    .status("ONLINE")
-                    .lastActive(LocalDateTime.now())
-                    .build())
-                .loadCell(BinStatusDTO.SensorStatusDTO.SensorInfo.builder()
-                    .status("ONLINE")
-                    .lastActive(LocalDateTime.now())
-                    .build())
-                .ultrasonic(BinStatusDTO.SensorStatusDTO.SensorInfo.builder()
-                    .status("ONLINE")
-                    .lastActive(LocalDateTime.now())
-                    .build())
-                .build())
-            .build();
-    }
-
     public List<BinListDTO> getAllBins(Boolean includeStatus) {
         List<BinListDTO> bins = new ArrayList<>();
 
@@ -148,45 +102,6 @@ public class BinService {
         }
 
         return bins;
-    }
-
-    // Mock: 수거가 필요한 쓰레기통 목록
-    public BinCollectionDTO getBinsNeedingCollection(Double threshold) {
-        List<BinCollectionDTO.CollectionBinDTO> bins = new ArrayList<>();
-
-        bins.add(BinCollectionDTO.CollectionBinDTO.builder()
-            .binId(2L)
-            .binName("공학관 2층 쓰레기통")
-            .fillRate(85.2)
-            .totalWeight(4200.5)
-            .priority("HIGH")
-            .location(BinCollectionDTO.CollectionBinDTO.LocationDTO.builder()
-                .building("공학관")
-                .floor(2)
-                .latitude(37.5666)
-                .longitude(126.9781)
-                .build())
-            .build());
-
-        bins.add(BinCollectionDTO.CollectionBinDTO.builder()
-            .binId(5L)
-            .binName("공학관 1층 쓰레기통")
-            .fillRate(82.1)
-            .totalWeight(3950.0)
-            .priority("HIGH")
-            .location(BinCollectionDTO.CollectionBinDTO.LocationDTO.builder()
-                .building("공학관")
-                .floor(1)
-                .latitude(37.5668)
-                .longitude(126.9785)
-                .build())
-            .build());
-
-        return BinCollectionDTO.builder()
-            .totalBins(10)
-            .needsCollectionCount(2)
-            .bins(bins)
-            .build();
     }
 
     // Mock: 쓰레기통 생성
