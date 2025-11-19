@@ -123,27 +123,47 @@ public class BinService {
             .build();
     }
 
-    // Mock: 전체 쓰레기통 목록 조회
     public List<BinListDTO> getAllBins(Boolean includeStatus) {
         List<BinListDTO> bins = new ArrayList<>();
 
-        for (int i = 1; i <= 5; i++) {
+        List<Bin> binList = binRepository.findAll();
+
+        for (Bin bin : binList) {
             bins.add(BinListDTO.builder()
-                .binId((long) i)
-                .binName("공학관 " + i + "층 쓰레기통")
+                .binId(Long.valueOf(bin.getBinCode()))
+                .binName(bin.getName())
                 .location(BinListDTO.LocationInfoDTO.builder()
-                    .building("공학관")
-                    .floor(i)
-                    .latitude(37.5665 + (i * 0.0001))
-                    .longitude(126.9780 + (i * 0.0001))
+                    .building(bin.getBuilding())
+                    .floor(bin.getFloor())
+                    .latitude(bin.getLatitude())
+                    .longitude(bin.getLongitude())
                     .build())
                 .status(includeStatus ? BinListDTO.StatusInfoDTO.builder()
+                    .binStatus(bin.getStatus())
                     .isOnline(true)
-                    .fillRate(50.0 + (i * 5))
-                    .needsCollection(i > 3)
+                    .fillRate(bin.getCapacity())
+                    .needsCollection(bin.getCapacity() > bin.getFillThreshold())
                     .build() : null)
                 .build());
         }
+
+//        for (int i = 1; i <= 5; i++) {
+//            bins.add(BinListDTO.builder()
+//                .binId((long) i)
+//                .binName("공학관 " + i + "층 쓰레기통")
+//                .location(BinListDTO.LocationInfoDTO.builder()
+//                    .building("공학관")
+//                    .floor(i)
+//                    .latitude(37.5665 + (i * 0.0001))
+//                    .longitude(126.9780 + (i * 0.0001))
+//                    .build())
+//                .status(includeStatus ? BinListDTO.StatusInfoDTO.builder()
+//                    .isOnline(true)
+//                    .fillRate(50.0 + (i * 5))
+//                    .needsCollection(i > 3)
+//                    .build() : null)
+//                .build());
+//        }
 
         return bins;
     }
