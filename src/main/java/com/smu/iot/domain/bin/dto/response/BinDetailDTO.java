@@ -5,53 +5,17 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-
 @Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class BinDetailDTO {
     private Long binId;
     private String binName;
-    private String binCode;
-    private LocationDTO location;
-    private SpecificationDTO specifications;
-    private StatusDTO status;
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class LocationDTO {
-        private String building;
-        private Integer floor;
-        private String room;
-        private Double latitude;
-        private Double longitude;
-        private String address;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class SpecificationDTO {
-        private Double capacity;
-        private Double heightCm;
-        private Double widthMm;
-        private Double maxWeight;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class StatusDTO {
-        private Boolean isActive;
-        private Boolean isOnline;
-        private LocalDateTime lastHeartbeat;
-        private LocalDate installDate;
-    }
+    private Long totalCups;          // 컵 투입 횟수
+    private Long abnormalCount;      // 비정상 투입 횟수
+    private Double fillRate;         // 채움률 (%)
+    private Double cupWeight;        // 컵통 무게 (kg)
+    private Double liquidWeight;     // 물통 무게 (kg)
+    private Double liquidRate;       // 액체 통 채움률 (%)
 }

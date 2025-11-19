@@ -1,5 +1,6 @@
 package com.smu.iot.domain.bin.dto.response;
 
+import com.smu.iot.domain.bin.entity.Bin;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -31,6 +32,7 @@ public class BinListDTO {
     @AllArgsConstructor
     @Builder
     public static class StatusInfoDTO {
+        private Bin.BinStatus binStatus;
         private Boolean isOnline;
         private Double fillRate;
         private Boolean needsCollection;

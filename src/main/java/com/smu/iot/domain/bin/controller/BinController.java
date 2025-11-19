@@ -7,6 +7,7 @@ import com.smu.iot.domain.bin.service.BinService;
 import com.smu.iot.global.apipayload.ApiResponse;
 import com.smu.iot.global.apipayload.code.GeneralSuccessCode;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,23 +29,11 @@ public class BinController {
         summary = "쓰레기통 기본 정보 조회",
         description = "특정 쓰레기통의 상세 정보를 조회"
     )
-    public ApiResponse<BinDetailDTO> getBinDetail(@PathVariable Long binId) {
+    public ApiResponse<BinInfoDTO> getBinInfo(@PathVariable Long binId) {
         log.info("Querying bin detail - binId: {}", binId);
 
-        BinDetailDTO detail = binService.getBinDetail(binId);
+        BinInfoDTO detail = binService.getBinInfo(binId);
         return ApiResponse.onSuccess(GeneralSuccessCode.OK, detail);
-    }
-
-    @GetMapping("/{binId}/status")
-    @Operation(
-        summary = "쓰레기통 현재 상태 조회",
-        description = "쓰레기통의 실시간 상태 정보를 조회 (채움률, 센서 상태 등)"
-    )
-    public ApiResponse<BinStatusDTO> getBinStatus(@PathVariable Long binId) {
-        log.info("Querying bin status - binId: {}", binId);
-
-        BinStatusDTO status = binService.getBinStatus(binId);
-        return ApiResponse.onSuccess(GeneralSuccessCode.OK, status);
     }
 
     @GetMapping
@@ -54,51 +43,98 @@ public class BinController {
     )
     public ApiResponse<List<BinListDTO>> getAllBins(
         @RequestParam(defaultValue = "true") Boolean includeStatus) {
-        
+
         log.info("Querying all bins - includeStatus: {}", includeStatus);
 
         List<BinListDTO> bins = binService.getAllBins(includeStatus);
         return ApiResponse.onSuccess(GeneralSuccessCode.OK, bins);
     }
 
-    @GetMapping("/needs-collection")
-    @Operation(
-        summary = "수거가 필요한 쓰레기통 목록 조회",
-        description = "채움률이 임계값을 초과한 쓰레기통 목록을 조회"
-    )
-    public ApiResponse<BinCollectionDTO> getBinsNeedingCollection(
-        @RequestParam(defaultValue = "80") Double threshold) {
-        
-        log.info("Querying bins needing collection - threshold: {}", threshold);
-
-        BinCollectionDTO result = binService.getBinsNeedingCollection(threshold);
-        return ApiResponse.onSuccess(GeneralSuccessCode.OK, result);
-    }
-
     @PostMapping
     @Operation(
-        summary = "쓰레기통 등록",
+        summary = "쓰레기통 등록(Mock)",
         description = "새로운 쓰레기통을 등록"
     )
-    public ApiResponse<BinDetailDTO> createBin(@RequestBody BinCreateRequestDTO request) {
+    public ApiResponse<BinInfoDTO> createBin(@RequestBody BinCreateRequestDTO request) {
         log.info("Creating new bin - binCode: {}", request.getBinCode());
 
-        BinDetailDTO result = binService.createBin(request);
+        BinInfoDTO result = binService.createBin(request);
         return ApiResponse.onSuccess(GeneralSuccessCode.CREATED, result);
     }
 
     @PutMapping("/{binId}")
     @Operation(
-        summary = "쓰레기통 정보 수정",
+        summary = "쓰레기통 정보 수정(Mock)",
         description = "기존 쓰레기통의 정보를 수정"
     )
-    public ApiResponse<BinDetailDTO> updateBin(
+    public ApiResponse<BinInfoDTO> updateBin(
         @PathVariable Long binId,
         @RequestBody BinUpdateRequestDTO request) {
-        
+
         log.info("Updating bin - binId: {}", binId);
 
-        BinDetailDTO result = binService.updateBin(binId, request);
+        BinInfoDTO result = binService.updateBin(binId, request);
+        return ApiResponse.onSuccess(GeneralSuccessCode.OK, result);
+    }
+
+    @GetMapping("/stats")
+    @Operation(
+        summary = "전체 쓰레기통 기간별 통계 조회",
+        description = "모든 쓰레기통의 컵 투입량, 액체 비율, 비정상 투입, 평균 채움률 통계를 조회합니다. (기간: daily, weekly, monthly)"
+    )
+    public ApiResponse<BinGlobalStatsDTO> getBinGlobalStats(
+        @RequestParam(defaultValue = "daily") String period) {
+
+        log.info("Querying global bin stats - period: {}", period);
+
+        BinGlobalStatsDTO stats = binService.getBinGlobalStats(period);
+        return ApiResponse.onSuccess(GeneralSuccessCode.OK, stats);
+    }
+
+    @GetMapping("detail/{binId}")
+    @Operation(
+        summary = "특정 쓰레기통 상세 조회",
+        description = "특정 쓰레기통의 컵 투입 횟수, 비정상 투입 횟수, 현재 무게(kg), 액체 채움률 등을 조회합니다."
+    )
+    public ApiResponse<BinDetailDTO> getBinDetail(@PathVariable Long binId) {
+        log.info("Querying detail stats for binId: {}", binId);
+        BinDetailDTO stats = binService.getBinDetail(binId);
+        return ApiResponse.onSuccess(GeneralSuccessCode.OK, stats);
+    }
+
+    @GetMapping("/{binId}/trend/cup")
+    @Operation(
+        summary = "컵 투입 트렌드 조회",
+        description = "특정 쓰레기통의 컵 투입 횟수 추이를 조회합니다. (옵션: 일간/월간)"
+    )
+    public ApiResponse<BinTrendResponseDTO> getCupTrend(
+        @PathVariable Long binId,
+        @Parameter(description = "조회 기간 타입 (daily, monthly)")
+        @RequestParam(defaultValue = "daily") String period,
+        @Parameter(description = "조회 날짜 (yyyy-MM-dd 또는 yyyy-MM)")
+        @RequestParam(required = false) String date) {
+
+        log.info("Querying cup trend - binId: {}, period: {}, date: {}", binId, period, date);
+        BinTrendResponseDTO result = binService.getCupTrend(binId, period, date);
+
+        return ApiResponse.onSuccess(GeneralSuccessCode.OK, result);
+    }
+
+    @GetMapping("/{binId}/trend/liquid")
+    @Operation(
+        summary = "액체 무게 변화량 트렌드 조회",
+        description = "특정 쓰레기통의 액체 무게 증가량 추이를 조회합니다. (옵션: 일간/월간)"
+    )
+    public ApiResponse<BinTrendResponseDTO> getLiquidTrend(
+        @PathVariable Long binId,
+        @Parameter(description = "조회 기간 타입 (daily, monthly)")
+        @RequestParam(defaultValue = "daily") String period,
+        @Parameter(description = "조회 날짜 (yyyy-MM-dd 또는 yyyy-MM)")
+        @RequestParam(required = false) String date) {
+
+        log.info("Querying liquid trend - binId: {}, period: {}, date: {}", binId, period, date);
+        BinTrendResponseDTO result = binService.getLiquidTrend(binId, period, date);
+
         return ApiResponse.onSuccess(GeneralSuccessCode.OK, result);
     }
 }
