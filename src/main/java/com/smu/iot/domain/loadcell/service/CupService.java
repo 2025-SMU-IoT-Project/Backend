@@ -1,5 +1,7 @@
 package com.smu.iot.domain.loadcell.service;
 
+import com.smu.iot.domain.bin.entity.Bin;
+import com.smu.iot.domain.bin.repository.BinRepository;
 import com.smu.iot.domain.event.service.EventService;
 import com.smu.iot.domain.loadcell.code.CupErrorCode;
 import com.smu.iot.domain.loadcell.dto.request.BinWeightInitRequestDTO;
@@ -33,6 +35,7 @@ import java.util.stream.Collectors;
 public class CupService {
 
     private final CupRepository cupRepository;
+    private final BinRepository binRepository;
     private final BinWeightRepository binWeightRepository;
     private final BinWeightHistoryRepository binWeightHistoryRepository;
     private final EventService eventService;
@@ -130,7 +133,15 @@ public class CupService {
         log.info("BinWeight updated - binId: {}, previousWeight: {}g, currentWeight: {}g",
             binId, previousWeight, currentBinWeight);
 
-        updateMainEvent(request.getUuid(), savedCup);
+        // LIVE UUID 처리: Event 생성 건너뛰고 Bin 상태 직접 업데이트
+        if ("LIVE".equals(request.getUuid())) {
+            Bin bin = binRepository.findById(binId)
+                .orElseThrow(() -> new GeneralException(CupErrorCode.BIN_NOT_FOUND));
+            bin.addWeight(cupWeight);
+            binRepository.save(bin);
+        } else {
+            updateMainEvent(request.getUuid(), savedCup);
+        }
 
         return convertToResponseDTO(savedCup);
     }
