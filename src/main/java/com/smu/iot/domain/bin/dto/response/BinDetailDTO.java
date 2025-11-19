@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class BinDetailDTO {
     private Long binId;
+    private String binName;
     private Long totalCups;          // 컵 투입 횟수
     private Long abnormalCount;      // 비정상 투입 횟수
     private Double fillRate;         // 채움률 (%)

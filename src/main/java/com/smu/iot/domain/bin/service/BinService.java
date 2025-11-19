@@ -147,24 +147,6 @@ public class BinService {
                 .build());
         }
 
-//        for (int i = 1; i <= 5; i++) {
-//            bins.add(BinListDTO.builder()
-//                .binId((long) i)
-//                .binName("공학관 " + i + "층 쓰레기통")
-//                .location(BinListDTO.LocationInfoDTO.builder()
-//                    .building("공학관")
-//                    .floor(i)
-//                    .latitude(37.5665 + (i * 0.0001))
-//                    .longitude(126.9780 + (i * 0.0001))
-//                    .build())
-//                .status(includeStatus ? BinListDTO.StatusInfoDTO.builder()
-//                    .isOnline(true)
-//                    .fillRate(50.0 + (i * 5))
-//                    .needsCollection(i > 3)
-//                    .build() : null)
-//                .build());
-//        }
-
         return bins;
     }
 
@@ -365,6 +347,7 @@ public class BinService {
 
         return BinDetailDTO.builder()
             .binId(binId)
+            .binName(bin.getName())
             .totalCups(totalCups)
             .abnormalCount(abnormalCount)
             .fillRate(Math.round(fillRate * 10) / 10.0)
