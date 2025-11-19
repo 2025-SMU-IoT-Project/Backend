@@ -40,6 +40,7 @@ public class EventDetailDTO {
         private Boolean detected;
         private String sensorId;
         private Boolean beamBlocked;
+        private Boolean isNormal;
         private LocalDateTime timestamp;
     }
 
@@ -55,6 +56,7 @@ public class EventDetailDTO {
         private Double maxDistance;
         private Double avgDistance;
         private List<SampleData> samples;
+        private Boolean isNormal;
         private LocalDateTime timestamp;
 
         @Data
@@ -76,6 +78,7 @@ public class EventDetailDTO {
         private Double weight;
         private Boolean isLiquid;
         private String cupType;
+        private Boolean isNormal;
         private LocalDateTime timestamp;
     }
 
@@ -86,6 +89,7 @@ public class EventDetailDTO {
     public static class LiquidDTO {
         private Boolean detected;
         private Double addedWeight;
+        private Boolean isNormal;
         private LocalDateTime timestamp;
     }
 
@@ -97,6 +101,7 @@ public class EventDetailDTO {
         private Boolean detected;
         private Double distanceCm;
         private Double fillRate;
+        private Boolean isNormal;
         private LocalDateTime timestamp;
     }
 

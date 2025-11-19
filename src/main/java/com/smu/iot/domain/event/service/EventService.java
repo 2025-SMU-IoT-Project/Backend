@@ -157,6 +157,22 @@ public class EventService {
             .collect(Collectors.toList());
     }
 
+    public List<EventSummaryDTO> getAllEvents() {
+        log.info("Querying all events");
+        List<Event> events = eventRepository.findAll();
+        return events.stream()
+            .map(this::convertToSummaryDTO)
+            .collect(Collectors.toList());
+    }
+
+    public List<EventSummaryDTO> getEventsByBinId(Long binId) {
+        log.info("Querying events by binId: {}", binId);
+        List<Event> events = eventRepository.findByBin_IdOrderByCreatedAtDesc(binId);
+        return events.stream()
+            .map(this::convertToSummaryDTO)
+            .collect(Collectors.toList());
+    }
+
     public List<EventSummaryDTO> getEventsByDateRange(
         Long binId,
         LocalDateTime startDate,
@@ -180,6 +196,7 @@ public class EventService {
                 .detected(true)
                 .sensorId(event.getIrData().getSensorId())
                 .beamBlocked(event.getIrData().getBeamBlocked())
+                .isNormal(event.getIrData().getCupType() == CupType.PLASTIC)
                 .timestamp(event.getIrTimestamp())
                 .build();
         }
@@ -207,6 +224,7 @@ public class EventService {
                 .avgDistance((event.getLaserData().getMinDiameterMm() +
                     event.getLaserData().getMaxDiameterMm()) / 2.0)
                 .samples(samples)
+                .isNormal(event.getLaserData().getIsValidCup())
                 .timestamp(event.getLaserTimestamp())
                 .build();
         }
@@ -219,6 +237,7 @@ public class EventService {
                 .weight(event.getCupData().getWeight())
                 .isLiquid(event.getCupData().getIsLiquid())
                 .cupType(event.getCupData().getCupType().name())
+                .isNormal(!event.getCupData().getIsLiquid())
                 .timestamp(event.getCupTimestamp())
                 .build();
         }
@@ -229,6 +248,7 @@ public class EventService {
             liquidDTO = EventDetailDTO.LiquidDTO.builder()
                 .detected(true)
                 .addedWeight(event.getLiquidHistoryData().getAddedWeight())
+                .isNormal(event.getLiquidHistoryData().getAddedWeight() <= 0) // 액체가 추가되지 않아야 정상
                 .timestamp(event.getLiquidHistoryData().getMeasuredAt())
                 .build();
         }
@@ -240,6 +260,7 @@ public class EventService {
                 .detected(true)
                 .distanceCm(event.getUltrasonicData().getDistanceCm())
                 .fillRate(event.getUltrasonicData().getFillRate())
+                .isNormal(event.getUltrasonicData().getFillRate() < 100.0)
                 .timestamp(event.getUltrasonicTimestamp())
                 .build();
         }
@@ -293,7 +314,29 @@ public class EventService {
             .hasLiquid(event.getHasLiquid())
             .cupType(cupType)
             .cupPattern(cupPattern)
+            .cupAccepted(event.getCupAccepted())
+            .description(generateEventDescription(event))
             .build();
+    }
+
+    private String generateEventDescription(Event event) {
+        if (event.getCupAccepted()) {
+            return "정상적으로 처리된 컵입니다.";
+        }
+
+        StringBuilder reason = new StringBuilder("수거 거부됨: ");
+        if (!event.getIsValidInput()) {
+            reason.append("유효하지 않은 컵(종이컵 등) 또는 이물질 감지. ");
+        }
+        if (event.getHasLiquid()) {
+            reason.append("컵 내부에 액체가 남아있음. ");
+        }
+        
+        if (event.getRejectionReason() != null && !event.getRejectionReason().isEmpty()) {
+             return "수거 거부됨: " + event.getRejectionReason();
+        }
+
+        return reason.toString().trim();
     }
 
     public enum SensorDataType {
