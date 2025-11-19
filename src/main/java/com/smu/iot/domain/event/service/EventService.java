@@ -71,6 +71,11 @@ public class EventService {
                     event.setCupAccepted(cupAccepted);
                     event.completeEvent();
                 }
+
+                // Bin 무게 업데이트
+                Bin bin = event.getBin();
+                bin.addWeight(((Cup) sensorData).getWeight());
+                binRepository.save(bin);
             }
             case LIQUID -> {
                 event.linkLiquidHistoryData((LiquidHistory) sensorData);
@@ -79,6 +84,12 @@ public class EventService {
                     event.setCupAccepted(cupAccepted);
                     event.completeEvent();
                 }
+
+                // Bin 무게 업데이트
+                Bin bin = event.getBin();
+                bin.addWeight(((LiquidHistory) sensorData).getAddedWeight());
+                bin.updateLiquidWeight(((LiquidHistory) sensorData).getWeight());
+                binRepository.save(bin);
             }
             case ULTRASONIC -> {
                 event.linkUltrasonicData((Ultrasonic) sensorData);
@@ -87,6 +98,11 @@ public class EventService {
                     event.setCupAccepted(cupAccepted);
                     event.completeEvent();
                 }
+
+                // Bin 상태 업데이트
+                Bin bin = event.getBin();
+                bin.updateFillLevel(((Ultrasonic) sensorData).getFillRate());
+                binRepository.save(bin);
             }
         }
 
@@ -331,9 +347,9 @@ public class EventService {
         if (event.getHasLiquid()) {
             reason.append("컵 내부에 액체가 남아있음. ");
         }
-        
+
         if (event.getRejectionReason() != null && !event.getRejectionReason().isEmpty()) {
-             return "수거 거부됨: " + event.getRejectionReason();
+            return "수거 거부됨: " + event.getRejectionReason();
         }
 
         return reason.toString().trim();

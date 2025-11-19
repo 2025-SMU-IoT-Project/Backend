@@ -3,7 +3,10 @@ package com.smu.iot.domain.bin.entity;
 import com.smu.iot.domain.event.entity.Event;
 import com.smu.iot.global.entity.BaseEntity;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -79,6 +82,14 @@ public class Bin extends BaseEntity {
     @Column(name = "weight_threshold")
     private Double weightThreshold;
 
+    @Column(name = "current_weight")
+    @Builder.Default
+    private Double currentWeight = 0.0;
+
+    @Column(name = "current_liquid_weight")
+    @Builder.Default
+    private Double currentLiquidWeight = 0.0;
+
     @OneToMany(mappedBy = "bin", fetch = FetchType.LAZY)
     @Builder.Default
     private List<Event> events = new ArrayList<>();
@@ -87,7 +98,7 @@ public class Bin extends BaseEntity {
     public enum BinStatus {
         NORMAL("정상"),
         WARNING("경고"),
-        FULL("만참"),
+        FULL("가득참"),
         OFFLINE("오프라인"),
         MAINTENANCE("유지보수중");
 
@@ -110,6 +121,8 @@ public class Bin extends BaseEntity {
     }
 
     public void updateFillLevel(Double fillRate) {
+        this.capacity = fillRate;
+
         if (fillRate >= (fillThreshold != null ? fillThreshold : 80.0)) {
             this.status = BinStatus.FULL;
         } else if (fillRate >= 70.0) {
@@ -117,5 +130,16 @@ public class Bin extends BaseEntity {
         } else {
             this.status = BinStatus.NORMAL;
         }
+    }
+
+    public void addWeight(Double weight) {
+        if (this.currentWeight == null) {
+            this.currentWeight = 0.0;
+        }
+        this.currentWeight += weight;
+    }
+
+    public void updateLiquidWeight(Double weight) {
+        this.currentLiquidWeight = weight;
     }
 }
