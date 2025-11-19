@@ -1,8 +1,7 @@
 package com.smu.iot.domain.ultrasonic.service;
 
+import com.smu.iot.domain.bin.entity.Bin;
 import com.smu.iot.domain.bin.repository.BinRepository;
-import com.smu.iot.domain.event.entity.Event;
-import com.smu.iot.domain.event.repository.EventRepository;
 import com.smu.iot.domain.event.service.EventService;
 import com.smu.iot.domain.ultrasonic.code.UltrasonicErrorCode;
 import com.smu.iot.domain.ultrasonic.dto.request.UltrasonicRequestDTO;
@@ -28,6 +27,7 @@ import java.util.stream.Collectors;
 public class UltrasonicService {
 
     private final UltrasonicRepository ultrasonicRepository;
+    private final BinRepository binRepository;
     private final EventService eventService;
 
     private static final double BIN_HEIGHT = 50.0; // cm
@@ -53,7 +53,15 @@ public class UltrasonicService {
 
         Ultrasonic saved = ultrasonicRepository.save(ultrasonic);
 
-        completeMainEvent(request.getUuid(), saved);
+        // LIVE UUID 처리: Event 생성 건너뛰고 Bin 상태 직접 업데이트
+        if ("LIVE".equals(request.getUuid())) {
+            Bin bin = binRepository.findById(request.getBinId())
+                .orElseThrow(() -> new GeneralException(UltrasonicErrorCode.INVALID_REQUEST)); // Bin not found
+            bin.updateFillLevel(fillRate);
+            binRepository.save(bin);
+        } else {
+            completeMainEvent(request.getUuid(), saved);
+        }
 
         return convertToResponseDTO(saved);
     }

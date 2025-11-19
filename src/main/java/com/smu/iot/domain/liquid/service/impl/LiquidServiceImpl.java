@@ -101,8 +101,15 @@ public class LiquidServiceImpl implements LiquidService {
         // LiquidHistory 기록 추가
         LiquidHistory liquidHistory = addLiquidHistory(liquid, updateLiquidDTO.getUuid());
 
-        // Event 업데이트
-        updateMainEvent(updateLiquidDTO.getUuid(), liquidHistory);
+        // LIVE UUID 처리: Event 생성 건너뛰고 Bin 상태 직접 업데이트
+        if ("LIVE".equals(updateLiquidDTO.getUuid())) {
+            bin.addWeight(liquidHistory.getAddedWeight());
+            bin.updateLiquidWeight(liquidHistory.getWeight());
+            binRepository.save(bin);
+        } else {
+            // Event 업데이트
+            updateMainEvent(updateLiquidDTO.getUuid(), liquidHistory);
+        }
 
         return liquid;
     }
@@ -119,8 +126,16 @@ public class LiquidServiceImpl implements LiquidService {
         // LiquidHistory 기록 추가
         LiquidHistory liquidHistory = addLiquidHistory(liquid, updateLiquidDTO.getUuid());
 
-        // Event 업데이트
-        updateMainEvent(updateLiquidDTO.getUuid(), liquidHistory);
+        // LIVE UUID 처리: Event 생성 건너뛰고 Bin 상태 직접 업데이트
+        if ("LIVE".equals(updateLiquidDTO.getUuid())) {
+            Bin bin = liquid.getBin();
+            bin.addWeight(liquidHistory.getAddedWeight());
+            bin.updateLiquidWeight(liquidHistory.getWeight());
+            binRepository.save(bin);
+        } else {
+            // Event 업데이트
+            updateMainEvent(updateLiquidDTO.getUuid(), liquidHistory);
+        }
 
         return liquid;
     }
@@ -192,8 +207,7 @@ public class LiquidServiceImpl implements LiquidService {
             uuid,
             liquidHistory.getBin().getId(),
             EventService.SensorDataType.LIQUID,
-            liquidHistory
-        );
+            liquidHistory);
     }
 
     public List<LiquidHistory> findLiquidsByDate(Long binId, PeriodType period, LocalDate date) {
