@@ -29,7 +29,7 @@ public class Laser extends BaseEntity {
     @Column(name = "distance_mm", nullable = false)
     private Double distanceMm;  // STM32에서 측정한 센서 거리 (mm)
 
-    @Column(name = "diameter_mm", nullable = false)
+    @Column(name = "diameter_mm")
     private Double diameterMm;  // 서버에서 계산한 컵 지름 (mm)
 
     // 지름 계산 (쓰레기통 너비 - 2 × 센서 거리)
