@@ -12,11 +12,14 @@ import com.smu.iot.domain.laser.entity.CupShape;
 import com.smu.iot.domain.liquid.entitiy.LiquidHistory;
 import com.smu.iot.domain.loadcell.entity.Cup;
 import com.smu.iot.domain.ultrasonic.entity.Ultrasonic;
+import com.smu.iot.global.apipayload.CursorResult;
 import com.smu.iot.global.apipayload.code.GeneralErrorCode;
 import com.smu.iot.global.apipayload.exception.GeneralException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -204,6 +207,53 @@ public class EventService {
             .collect(Collectors.toList());
     }
 
+    public CursorResult<EventSummaryDTO> getEventsByCursor(Long binId, Long cursorId, int limit) {
+        log.info("Querying events by cursor - binId: {}, cursorId: {}, limit: {}", binId, cursorId, limit);
+
+        Pageable pageable = PageRequest.of(0, limit);
+        List<Event> events;
+
+        if (cursorId == null) {
+            events = eventRepository.findAllByBin_IdOrderByIdDesc(binId, pageable);
+        } else {
+            events = eventRepository.findAllByBin_IdAndIdLessThanOrderByIdDesc(binId, cursorId, pageable);
+        }
+
+        return createCursorResult(events, limit);
+    }
+
+    public CursorResult<EventSummaryDTO> getAllEventsByCursor(Long cursorId, int limit) {
+        log.info("Querying all events by cursor - cursorId: {}, limit: {}", cursorId, limit);
+
+        Pageable pageable = PageRequest.of(0, limit);
+        List<Event> events;
+
+        if (cursorId == null) {
+            events = eventRepository.findAllByOrderByIdDesc(pageable);
+        } else {
+            events = eventRepository.findAllByIdLessThanOrderByIdDesc(cursorId, pageable);
+        }
+
+        return createCursorResult(events, limit);
+    }
+
+    private CursorResult<EventSummaryDTO> createCursorResult(List<Event> events, int limit) {
+        List<EventSummaryDTO> eventDtos = events.stream()
+            .map(this::convertToSummaryDTO)
+            .collect(Collectors.toList());
+
+        Long nextCursor = null;
+        boolean hasNext = false;
+
+        if (!events.isEmpty()) {
+            nextCursor = events.get(events.size() - 1).getId();
+
+            hasNext = events.size() == limit;
+        }
+
+        return new CursorResult<>(eventDtos, nextCursor, hasNext);
+    }
+
     private EventDetailDTO convertToDetailDTO(Event event) {
         // IR 센서 데이터
         EventDetailDTO.IrSensorDTO irSensorDTO = null;
@@ -314,7 +364,7 @@ public class EventService {
 
         // 로드셀 데이터가 있으면 cupType 설정
         if (event.getHasCupData() && event.getCupData() != null) {
-            cupType = event.getCupData().getCupType().name();
+            cupType = event.getCupData().getCupType().getDescription();
         }
 
         // 레이저 데이터가 있으면 cupPattern 설정

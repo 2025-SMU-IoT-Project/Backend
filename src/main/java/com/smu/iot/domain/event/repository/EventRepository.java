@@ -1,6 +1,7 @@
 package com.smu.iot.domain.event.repository;
 
 import com.smu.iot.domain.event.entity.Event;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -23,18 +24,24 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     List<Event> findByBinIdAndDateRange(
         @Param("binId") Long binId,
         @Param("startDate") LocalDateTime startDate,
-        @Param("endDate") LocalDateTime endDate
-    );
+        @Param("endDate") LocalDateTime endDate);
 
     @Query("SELECT e FROM Event e WHERE e.startTime BETWEEN :start AND :end")
     List<Event> findAllByDateRange(
         @Param("start") LocalDateTime start,
-        @Param("end") LocalDateTime end
-    );
+        @Param("end") LocalDateTime end);
 
     long countByBin_Id(Long binId);
 
     long countByBin_IdAndIsValidInputFalse(Long binId);
 
     List<Event> findByBin_IdAndCreatedAtBetween(Long binId, LocalDateTime start, LocalDateTime end);
+
+    List<Event> findAllByBin_IdAndIdLessThanOrderByIdDesc(Long binId, Long id, Pageable pageable);
+
+    List<Event> findAllByIdLessThanOrderByIdDesc(Long id, Pageable pageable);
+
+    List<Event> findAllByBin_IdOrderByIdDesc(Long binId, Pageable pageable);
+
+    List<Event> findAllByOrderByIdDesc(Pageable pageable);
 }
