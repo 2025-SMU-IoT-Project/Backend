@@ -30,14 +30,13 @@ public class LaserService {
     private final InsertionEventRepository eventRepository;
     private final EventService eventService;
 
-    // 유효성 검증 상수
-    private static final int MIN_SAMPLE_COUNT = 10;  // 최소 샘플 수
-    private static final double MIN_BOTTOM_DIAMETER = 40.0;  // 최소 하단 지름 (mm)
-    private static final double MAX_BOTTOM_DIAMETER = 80.0;  // 최대 하단 지름 (mm)
-    private static final double MIN_TOP_DIAMETER = 80.0;  // 최소 상단 지름 (mm)
-    private static final double MAX_TOP_DIAMETER = 120.0;  // 최대 상단 지름 (mm)
-    private static final double MIN_DIAMETER_CHANGE = 20.0;  // 최소 지름 변화량 (mm)
-    private static final double CONSTANT_THRESHOLD = 20.0;  // 일정 패턴 임계값 (mm)
+    // 거리 기반 판단 상수 (mm)
+    private static final int MOVING_AVERAGE_WINDOW = 5; // 이동 평균 윈도우 크기
+    private static final double DETECT_THRESHOLD_MM = 260.0; // 물체 감지 임계값 (이보다 작으면 물체)
+    private static final double CUP_MIN_DIST_MM = 120.0; // 컵 유효 거리 최소값
+    private static final double CUP_MAX_DIST_MM = 240.0; // 컵 유효 거리 최대값
+    private static final double MIN_VALID_DIAMETER = 40.0; // 유효 지름 최소값 (이보다 작으면 null 처리)
+    private static final double CONSTANT_THRESHOLD = 20.0; // 일정 패턴 임계값 (mm)
 
     // 메인 처리 로직: STM32에서 받은 투입 이벤트 데이터 처리
     public InsertionEventResponseDTO processInsertionEvent(InsertionEventRequestDTO request) {
@@ -50,14 +49,14 @@ public class LaserService {
             // 1. 기본 검증
             validateInput(request);
 
-            // 2. 지름 계산
-            List<Double> diameters = calculateDiameters(request);
-            log.info("Calculated diameters: min={}, max={}",
-                diameters.stream().min(Double::compare).orElse(0.0),
-                diameters.stream().max(Double::compare).orElse(0.0));
+            // 2. 이동 평균 필터 적용 및 거리 데이터 추출
+            List<Double> smoothedDistances = applyMovingAverage(request.getSamples());
 
-            // 3. 패턴 분석
-            PatternAnalysisResult analysisResult = analyzeCupPattern(diameters);
+            // 3. 지름 계산
+            List<Double> diameters = calculateDiameters(request.getBinWidthMm(), smoothedDistances);
+
+            // 4. 패턴 분석
+            PatternAnalysisResult analysisResult = analyzeCupPattern(smoothedDistances, diameters);
             log.info("Pattern analysis: type={}, valid={}",
                 analysisResult.getPatternType(), analysisResult.isValid());
 
@@ -67,10 +66,17 @@ public class LaserService {
             // 5. 측정값 엔티티 생성 및 연결
             for (int i = 0; i < request.getSamples().size(); i++) {
                 InsertionEventRequestDTO.SampleData sample = request.getSamples().get(i);
+                Double diameter = diameters.get(i);
+
+                // 40mm 미만인 지름은 유효하지 않은 값으로 간주하여 null 저장
+                if (diameter != null && diameter < MIN_VALID_DIAMETER) {
+                    diameter = null;
+                }
+
                 Laser measurement = Laser.builder()
                     .timeMsec(sample.getTimeMsec())
                     .distanceMm(sample.getDistanceMm())
-                    .diameterMm(diameters.get(i))
+                    .diameterMm(diameter)
                     .build();
                 event.addMeasurement(measurement);
             }
@@ -107,7 +113,7 @@ public class LaserService {
             throw new GeneralException(LaserErrorCode.INSUFFICIENT_SAMPLES);
         }
 
-        if (request.getSamples().size() < MIN_SAMPLE_COUNT) {
+        if (request.getSamples().size() < MOVING_AVERAGE_WINDOW) {
             throw new GeneralException(LaserErrorCode.INSUFFICIENT_SAMPLES);
         }
 
@@ -116,114 +122,122 @@ public class LaserService {
         }
     }
 
-    // 지름 계산: 쓰레기통 너비 - (2 × 센서 거리)
-    private List<Double> calculateDiameters(InsertionEventRequestDTO request) {
-        return request.getSamples().stream()
-            .map(sample -> Laser.calculateDiameter(
-                request.getBinWidthMm(),
-                sample.getDistanceMm()))
+    // 이동 평균 필터 적용
+    private List<Double> applyMovingAverage(List<InsertionEventRequestDTO.SampleData> samples) {
+        List<Double> smoothed = new ArrayList<>();
+        double sum = 0;
+        int count = 0;
+
+        // 초기 윈도우 채우기 및 이동 평균 계산
+        for (int i = 0; i < samples.size(); i++) {
+            double val = samples.get(i).getDistanceMm();
+            sum += val;
+            count++;
+
+            if (count > MOVING_AVERAGE_WINDOW) {
+                sum -= samples.get(i - MOVING_AVERAGE_WINDOW).getDistanceMm();
+                count--;
+            }
+
+            smoothed.add(sum / count);
+        }
+        return smoothed;
+    }
+
+    // 깊이 계산: 쓰레기통 너비 - 센서 거리
+    private List<Double> calculateDiameters(double binWidthMm, List<Double> distances) {
+        return distances.stream()
+            .map(distance -> binWidthMm - distance)
             .collect(Collectors.toList());
     }
 
-    // 패턴 분석: 지름 변화 패턴을 분석하여 유효성 판단
-    private PatternAnalysisResult analyzeCupPattern(List<Double> diameters) {
+    // 패턴 분석: 거리 변화 패턴을 분석하여 유효성 판단
+    private PatternAnalysisResult analyzeCupPattern(List<Double> distances, List<Double> diameters) {
         PatternAnalysisResult result = new PatternAnalysisResult();
 
-        double minDiameter = diameters.stream().min(Double::compare).orElse(0.0);
-        double maxDiameter = diameters.stream().max(Double::compare).orElse(0.0);
-        double diameterChange = maxDiameter - minDiameter;
+        // 1. 물체 감지 여부 확인 (임계값 이하인 데이터가 있는지)
+        // 배경보다 가까운 물체만 유효 데이터로 간주
+        List<Double> validDistances = distances.stream()
+            .filter(d -> d <= DETECT_THRESHOLD_MM)
+            .collect(Collectors.toList());
+
+        if (validDistances.isEmpty()) {
+            result.setPatternType(PatternType.IRREGULAR);
+            result.setValid(false);
+            result.setRejectionReason("유효한 물체가 감지되지 않았습니다. (배경만 감지됨)");
+            return result;
+        }
+
+        // 통계 계산 (전체 데이터 기준, 단 40mm 미만은 제외)
+        List<Double> validDiametersForStats = diameters.stream()
+            .filter(d -> d >= MIN_VALID_DIAMETER)
+            .toList();
+
+        Double minDiameter = null;
+        Double maxDiameter = null;
+        Double diameterChange = null;
+
+        if (!validDiametersForStats.isEmpty()) {
+            minDiameter = validDiametersForStats.stream().min(Double::compare).orElse(0.0);
+            maxDiameter = validDiametersForStats.stream().max(Double::compare).orElse(0.0);
+            diameterChange = maxDiameter - minDiameter;
+        }
 
         result.setMinDiameter(minDiameter);
         result.setMaxDiameter(maxDiameter);
         result.setDiameterChange(diameterChange);
 
         // 1. 지름 변화량이 너무 작음 → 캔/병 (원통형)
-        if (diameterChange < CONSTANT_THRESHOLD) {
+        if (diameterChange != null && diameterChange < CONSTANT_THRESHOLD) {
             result.setPatternType(PatternType.CONSTANT);
             result.setValid(false);
             result.setRejectionReason("지름 변화가 없습니다. 캔 또는 병으로 추정됩니다.");
             return result;
         }
 
-        // 2. 정상 패턴 체크 (60→100mm)
-        if (isNormalPattern(diameters)) {
-            result.setPatternType(PatternType.NORMAL);
+        // 2. 유효 범위 확인 (정상 컵 범위 내에 있는지)
+        boolean isInValidRange = validDistances.stream()
+            .anyMatch(d -> d >= CUP_MIN_DIST_MM && d <= CUP_MAX_DIST_MM);
 
-            // 지름 범위 검증
-            if (!validateDiameterRange(minDiameter, maxDiameter)) {
-                result.setValid(false);
-                result.setRejectionReason(
-                    String.format("지름 범위가 비정상입니다. (하단: %.1fmm, 상단: %.1fmm)",
-                        minDiameter, maxDiameter));
-                return result;
-            }
-
-            // 지름 변화량 검증
-            if (diameterChange < MIN_DIAMETER_CHANGE) {
-                result.setValid(false);
-                result.setRejectionReason(
-                    String.format("지름 변화량이 부족합니다. (변화량: %.1fmm, 최소: %.1fmm)",
-                        diameterChange, MIN_DIAMETER_CHANGE));
-                return result;
-            }
-
-            result.setValid(true);
-            result.setRejectionReason(null);
+        if (!isInValidRange) {
+            result.setPatternType(PatternType.IRREGULAR);
+            result.setValid(false);
+            result.setRejectionReason("감지된 물체가 컵의 유효 거리 범위를 벗어났습니다.");
             return result;
         }
 
-        // 3. 비정상 패턴 체크 (100→60mm)
-        if (isDecreasingPattern(diameters)) {
+        // 3. 패턴 확인
+        // 유효 데이터 중 시작(바닥)과 끝(입구) 부분의 평균 거리 비교
+        int sampleSize = validDistances.size();
+        int checkSize = Math.min(5, sampleSize / 3); // 앞뒤 1/3 지점 또는 5개 샘플 비교
+
+        if (checkSize == 0) {
+            // 데이터가 너무 적은 경우 단순 통과 (이미 유효 범위 체크는 통과했으므로)
+            result.setPatternType(PatternType.NORMAL);
+            result.setValid(true);
+            return result;
+        }
+
+        double startAvg = 0;
+        double endAvg = 0;
+        for (int i = 0; i < checkSize; i++) {
+            startAvg += validDistances.get(i);
+            endAvg += validDistances.get(sampleSize - 1 - i);
+        }
+        startAvg /= checkSize;
+        endAvg /= checkSize;
+
+        // 바닥(Start)이 입구(End)보다 거리가 멀어야 함 (값이 커야 함)
+        if (startAvg > endAvg) {
+            result.setPatternType(PatternType.NORMAL);
+            result.setValid(true);
+        } else {
             result.setPatternType(PatternType.ABNORMAL);
             result.setValid(false);
             result.setRejectionReason("컵이 뒤집혀서 투입되었습니다.");
-            return result;
         }
 
-        // 4. 불규칙 패턴
-        result.setPatternType(PatternType.IRREGULAR);
-        result.setValid(false);
-        result.setRejectionReason("불규칙한 형태가 감지되었습니다.");
         return result;
-    }
-
-    // 정상 패턴 체크
-    private boolean isNormalPattern(List<Double> diameters) {
-        int increasingCount = 0;
-        int totalPairs = diameters.size() - 1;
-
-        for (int i = 0; i < totalPairs; i++) {
-            if (diameters.get(i + 1) >= diameters.get(i)) {
-                increasingCount++;
-            }
-        }
-
-        // 80% 이상이 증가하면 정상으로 판단
-        double increasingRatio = (double) increasingCount / totalPairs;
-        return increasingRatio >= 0.8;
-    }
-
-    // 감소 패턴 체크
-    private boolean isDecreasingPattern(List<Double> diameters) {
-        int decreasingCount = 0;
-        int totalPairs = diameters.size() - 1;
-
-        for (int i = 0; i < totalPairs; i++) {
-            if (diameters.get(i + 1) <= diameters.get(i)) {
-                decreasingCount++;
-            }
-        }
-
-        // 80% 이상이 감소하면 정상으로 판단
-        double decreasingRatio = (double) decreasingCount / totalPairs;
-        return decreasingRatio >= 0.8;
-    }
-
-    // 지름 범위 검증
-    private boolean validateDiameterRange(double minDiameter, double maxDiameter) {
-        boolean validBottom = minDiameter >= MIN_BOTTOM_DIAMETER && minDiameter <= MAX_BOTTOM_DIAMETER;
-        boolean validTop = maxDiameter >= MIN_TOP_DIAMETER && maxDiameter <= MAX_TOP_DIAMETER;
-        return validBottom && validTop;
     }
 
     // 이벤트 엔티티 생성

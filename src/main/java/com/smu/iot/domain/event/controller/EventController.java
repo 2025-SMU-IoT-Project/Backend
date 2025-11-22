@@ -4,6 +4,7 @@ import com.smu.iot.domain.event.dto.response.EventDetailDTO;
 import com.smu.iot.domain.event.dto.response.EventSummaryDTO;
 import com.smu.iot.domain.event.service.EventService;
 import com.smu.iot.global.apipayload.ApiResponse;
+import com.smu.iot.global.apipayload.CursorResult;
 import com.smu.iot.global.apipayload.code.GeneralSuccessCode;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -70,15 +71,32 @@ public class EventController {
     }
 
     @GetMapping
-    @Operation(summary = "전체 이벤트 목록 조회", description = "모든 이벤트를 조회합니다.")
-    public ApiResponse<List<EventSummaryDTO>> getAllEvents() {
-        List<EventSummaryDTO> events = eventService.getAllEvents();
+    @Operation(summary = "전체 이벤트 목록 조회 (커서 기반)",
+        description = "모든 이벤트를 커서 기반으로 조회합니다."
+    )
+    public ApiResponse<CursorResult<EventSummaryDTO>> getAllEvents(
+        @RequestParam(required = false) Long cursorId,
+        @RequestParam(defaultValue = "20") int limit) {
+        CursorResult<EventSummaryDTO> events = eventService.getAllEventsByCursor(cursorId, limit);
+        return ApiResponse.onSuccess(GeneralSuccessCode.OK, events);
+    }
+
+    @GetMapping("/bin/{binId}/cursor")
+    @Operation(summary = "특정 쓰레기통의 이벤트 목록 조회 (커서 기반)",
+        description = "특정 binId의 이벤트를 커서 기반으로 조회합니다."
+    )
+    public ApiResponse<CursorResult<EventSummaryDTO>> getEventsByBinIdCursor(
+        @PathVariable Long binId,
+        @RequestParam(required = false) Long cursorId,
+        @RequestParam(defaultValue = "20") int limit) {
+        CursorResult<EventSummaryDTO> events = eventService.getEventsByCursor(binId, cursorId, limit);
         return ApiResponse.onSuccess(GeneralSuccessCode.OK, events);
     }
 
     @GetMapping("/bin/{binId}")
     @Operation(summary = "특정 쓰레기통의 이벤트 목록 조회",
-        description = "특정 binId의 모든 이벤트를 조회합니다.")
+        description = "특정 binId의 모든 이벤트를 조회합니다."
+    )
     public ApiResponse<List<EventSummaryDTO>> getEventsByBinId(
         @PathVariable Long binId) {
         List<EventSummaryDTO> events = eventService.getEventsByBinId(binId);
