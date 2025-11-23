@@ -207,31 +207,48 @@ public class EventService {
             .collect(Collectors.toList());
     }
 
-    public CursorResult<EventSummaryDTO> getEventsByCursor(Long binId, Long cursorId, int limit) {
-        log.info("Querying events by cursor - binId: {}, cursorId: {}, limit: {}", binId, cursorId, limit);
+    public CursorResult<EventSummaryDTO> getEventsByCursor(Long binId, Long cursorId, int limit, Boolean onlyAbnormal) {
+        log.info("Querying events by cursor - binId: {}, cursorId: {}, limit: {}, onlyAbnormal: {}", binId, cursorId, limit, onlyAbnormal);
 
         Pageable pageable = PageRequest.of(0, limit);
         List<Event> events;
 
-        if (cursorId == null) {
-            events = eventRepository.findAllByBin_IdOrderByIdDesc(binId, pageable);
+        if (Boolean.TRUE.equals(onlyAbnormal)) {
+            if (cursorId == null) {
+                events = eventRepository.findAllByBin_IdAndCupAcceptedFalseOrderByIdDesc(binId, pageable);
+            } else {
+                events = eventRepository.findAllByBin_IdAndCupAcceptedFalseAndIdLessThanOrderByIdDesc(binId, cursorId,
+                    pageable);
+            }
         } else {
-            events = eventRepository.findAllByBin_IdAndIdLessThanOrderByIdDesc(binId, cursorId, pageable);
+            if (cursorId == null) {
+                events = eventRepository.findAllByBin_IdOrderByIdDesc(binId, pageable);
+            } else {
+                events = eventRepository.findAllByBin_IdAndIdLessThanOrderByIdDesc(binId, cursorId, pageable);
+            }
         }
 
         return createCursorResult(events, limit);
     }
 
-    public CursorResult<EventSummaryDTO> getAllEventsByCursor(Long cursorId, int limit) {
-        log.info("Querying all events by cursor - cursorId: {}, limit: {}", cursorId, limit);
+    public CursorResult<EventSummaryDTO> getAllEventsByCursor(Long cursorId, int limit, Boolean onlyAbnormal) {
+        log.info("Querying all events by cursor - cursorId: {}, limit: {}, onlyAbnormal: {}", cursorId, limit, onlyAbnormal);
 
         Pageable pageable = PageRequest.of(0, limit);
         List<Event> events;
 
-        if (cursorId == null) {
-            events = eventRepository.findAllByOrderByIdDesc(pageable);
+        if (Boolean.TRUE.equals(onlyAbnormal)) {
+            if (cursorId == null) {
+                events = eventRepository.findAllByCupAcceptedFalseOrderByIdDesc(pageable);
+            } else {
+                events = eventRepository.findAllByCupAcceptedFalseAndIdLessThanOrderByIdDesc(cursorId, pageable);
+            }
         } else {
-            events = eventRepository.findAllByIdLessThanOrderByIdDesc(cursorId, pageable);
+            if (cursorId == null) {
+                events = eventRepository.findAllByOrderByIdDesc(pageable);
+            } else {
+                events = eventRepository.findAllByIdLessThanOrderByIdDesc(cursorId, pageable);
+            }
         }
 
         return createCursorResult(events, limit);
