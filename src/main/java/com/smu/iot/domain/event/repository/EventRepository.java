@@ -44,4 +44,12 @@ public interface EventRepository extends JpaRepository<Event, Long> {
     List<Event> findAllByBin_IdOrderByIdDesc(Long binId, Pageable pageable);
 
     List<Event> findAllByOrderByIdDesc(Pageable pageable);
+
+    List<Event> findAllByCupAcceptedFalseOrderByIdDesc(Pageable pageable);
+
+    List<Event> findAllByCupAcceptedFalseAndIdLessThanOrderByIdDesc(Long id, Pageable pageable);
+
+    List<Event> findAllByBin_IdAndCupAcceptedFalseOrderByIdDesc(Long binId, Pageable pageable);
+
+    List<Event> findAllByBin_IdAndCupAcceptedFalseAndIdLessThanOrderByIdDesc(Long binId, Long id, Pageable pageable);
 }
