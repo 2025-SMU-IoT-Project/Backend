@@ -29,14 +29,82 @@ public class LaserService {
 
     private final InsertionEventRepository eventRepository;
     private final EventService eventService;
+    private final com.smu.iot.domain.laser.repository.LaserRawDataRepository rawDataRepository;
+    private final com.smu.iot.domain.bin.repository.BinRepository binRepository;
+    private final com.smu.iot.domain.event.repository.EventRepository mainEventRepository;
 
     // 거리 기반 판단 상수 (mm)
     private static final int MOVING_AVERAGE_WINDOW = 5; // 이동 평균 윈도우 크기
-    private static final double DETECT_THRESHOLD_MM = 260.0; // 물체 감지 임계값 (이보다 작으면 물체)
-    private static final double CUP_MIN_DIST_MM = 120.0; // 컵 유효 거리 최소값
-    private static final double CUP_MAX_DIST_MM = 240.0; // 컵 유효 거리 최대값
+    private static final double DETECT_THRESHOLD_MM = 440.0; // 물체 감지 임계값 (이보다 작으면 물체), 쓰리게통 너비 - 40 정도
+    private static final double CUP_MIN_DIST_MM = 120.0; // 컵 유효 거리 최소값, 310 정도?
+    private static final double CUP_MAX_DIST_MM = 420.0; // 컵 유효 거리 최대값, DETECT_THRESHOLD_MM - 20
     private static final double MIN_VALID_DIAMETER = 40.0; // 유효 지름 최소값 (이보다 작으면 null 처리)
     private static final double CONSTANT_THRESHOLD = 20.0; // 일정 패턴 임계값 (mm)
+
+    // 메인 처리 로직: STM32에서 받은 투입 이벤트 데이터 처리
+    public InsertionEventResponseDTO processPacket(com.smu.iot.domain.laser.dto.request.LaserPacketRequestDTO request) {
+        log.info("Received packet - UUID: {}, idx: {}", request.getUuid(), request.getIdx());
+
+        // 1. 패킷 저장
+        com.smu.iot.domain.laser.entity.LaserRawData rawData = com.smu.iot.domain.laser.entity.LaserRawData.builder()
+            .uuid(request.getUuid())
+            .idx(request.getIdx())
+            .data(request.getData())
+            .build();
+        rawDataRepository.save(rawData);
+
+        // 2. 전체 패킷 수신 여부 확인 (총 25개)
+        long count = rawDataRepository.countByUuid(request.getUuid());
+        if (count < 25) {
+            return null; // 아직 다 안 모임
+        }
+
+        // 3. 데이터 재조립
+        List<com.smu.iot.domain.laser.entity.LaserRawData> allPackets = rawDataRepository
+            .findAllByUuid(request.getUuid());
+        allPackets.sort(java.util.Comparator.comparingInt(com.smu.iot.domain.laser.entity.LaserRawData::getIdx));
+
+        List<InsertionEventRequestDTO.SampleData> samples = new ArrayList<>();
+        int timeMsec = 0;
+        for (com.smu.iot.domain.laser.entity.LaserRawData packet : allPackets) {
+            for (Integer distance : packet.getData()) {
+                samples.add(new InsertionEventRequestDTO.SampleData(timeMsec, distance.doubleValue()));
+                timeMsec += 20; // 20ms 간격
+            }
+        }
+
+        // 4. BinId 및 Width 조회
+        Long binId = 1L; // Default
+        Double binWidthMm = 490.0; // Default
+
+        // UUID로 기존 이벤트 조회하여 BinId 확인
+        java.util.Optional<com.smu.iot.domain.event.entity.Event> existingEvent = mainEventRepository
+            .findByUuid(request.getUuid());
+        if (existingEvent.isPresent()) {
+            binId = existingEvent.get().getBin().getId();
+            binWidthMm = existingEvent.get().getBin().getWidthMm();
+        } else {
+            // 이벤트가 없으면 BinId=1의 정보 가져오기
+            com.smu.iot.domain.bin.entity.Bin bin = binRepository.findById(binId).orElse(null);
+            if (bin != null) {
+                binWidthMm = bin.getWidthMm();
+            }
+        }
+
+        // 5. 통합 DTO 생성
+        InsertionEventRequestDTO fullRequest = InsertionEventRequestDTO.builder()
+            .uuid(request.getUuid())
+            .binId(binId)
+            .binWidthMm(binWidthMm)
+            .samples(samples)
+            .build();
+
+        // 6. 처리 및 데이터 삭제
+        InsertionEventResponseDTO response = processInsertionEvent(fullRequest);
+        rawDataRepository.deleteAllByUuid(request.getUuid());
+
+        return response;
+    }
 
     // 메인 처리 로직: STM32에서 받은 투입 이벤트 데이터 처리
     public InsertionEventResponseDTO processInsertionEvent(InsertionEventRequestDTO request) {
@@ -159,7 +227,7 @@ public class LaserService {
         // 배경보다 가까운 물체만 유효 데이터로 간주
         List<Double> validDistances = distances.stream()
             .filter(d -> d <= DETECT_THRESHOLD_MM)
-            .collect(Collectors.toList());
+            .toList();
 
         if (validDistances.isEmpty()) {
             result.setPatternType(PatternType.IRREGULAR);
