@@ -35,10 +35,10 @@ public class LaserService {
 
     // 거리 기반 판단 상수 (mm)
     private static final int MOVING_AVERAGE_WINDOW = 5; // 이동 평균 윈도우 크기
-    private static final double DETECT_THRESHOLD_MM = 440.0; // 물체 감지 임계값 (이보다 작으면 물체), 쓰리게통 너비 - 40 정도
+    private static final double DETECT_THRESHOLD_MM = 480.0; // 물체 감지 임계값 (이보다 작으면 물체), 쓰리기통 너비 - 10 정도
     private static final double CUP_MIN_DIST_MM = 120.0; // 컵 유효 거리 최소값, 310 정도?
-    private static final double CUP_MAX_DIST_MM = 420.0; // 컵 유효 거리 최대값, DETECT_THRESHOLD_MM - 20
-    private static final double MIN_VALID_DIAMETER = 40.0; // 유효 지름 최소값 (이보다 작으면 null 처리)
+    private static final double CUP_MAX_DIST_MM = 480.0; // 컵 유효 거리 최대값, DETECT_THRESHOLD_MM와 동일하게
+    private static final double MIN_VALID_DIAMETER = 30.0; // 유효 지름 최소값 (이보다 작으면 null 처리)
     private static final double CONSTANT_THRESHOLD = 20.0; // 일정 패턴 임계값 (mm)
 
     // 메인 처리 로직: STM32에서 받은 투입 이벤트 데이터 처리
@@ -53,9 +53,9 @@ public class LaserService {
             .build();
         rawDataRepository.save(rawData);
 
-        // 2. 전체 패킷 수신 여부 확인 (총 25개)
+        // 2. 전체 패킷 수신 여부 확인 (총 50개)
         long count = rawDataRepository.countByUuid(request.getUuid());
-        if (count < 25) {
+        if (count < 50) {
             return null; // 아직 다 안 모임
         }
 
@@ -171,8 +171,7 @@ public class LaserService {
             uuid,
             laserData.getBinId(),
             EventService.SensorDataType.LASER,
-            laserData
-        );
+            laserData);
     }
 
     // 입력 데이터 검증
