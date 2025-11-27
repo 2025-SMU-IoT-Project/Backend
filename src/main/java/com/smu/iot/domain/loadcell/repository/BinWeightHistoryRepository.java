@@ -1,6 +1,7 @@
 package com.smu.iot.domain.loadcell.repository;
 
 import com.smu.iot.domain.loadcell.entity.BinWeightHistory;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -20,6 +21,9 @@ public interface BinWeightHistoryRepository extends JpaRepository<BinWeightHisto
     List<BinWeightHistory> findByBinIdAndTimeRange(
         @Param("binId") Long binId,
         @Param("startTime") LocalDateTime startTime,
-        @Param("endTime") LocalDateTime endTime
-    );
+        @Param("endTime") LocalDateTime endTime);
+
+    List<BinWeightHistory> findByBinIdAndUuidOrderByCreatedAtDesc(Long binId, String uuid, Pageable pageable);
+
+    List<BinWeightHistory> findByBinIdOrderByCreatedAtDesc(Long binId, Pageable pageable);
 }

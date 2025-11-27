@@ -1,6 +1,7 @@
 package com.smu.iot.domain.liquid.service.impl;
 
 import com.smu.iot.domain.bin.code.BinErrorCode;
+import com.smu.iot.domain.bin.dto.response.SensorHistoryResponseDTO;
 import com.smu.iot.domain.bin.entity.Bin;
 import com.smu.iot.domain.bin.repository.BinRepository;
 import com.smu.iot.domain.event.service.EventService;
@@ -19,6 +20,8 @@ import com.smu.iot.global.apipayload.exception.handler.BinHandler;
 import com.smu.iot.global.apipayload.exception.handler.LiquidHandler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,6 +29,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.WeekFields;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -76,11 +80,11 @@ public class LiquidServiceImpl implements LiquidService {
             .map(LiquidConverter::toLiquidPreviewDTO)
             .toList();
 
-        double averageWeight = items.isEmpty() ? 0.0 :
-            items.stream()
-                .mapToDouble(LiquidResponseDTO.LiquidPreviewDTO::getWeight)
-                .average()
-                .orElse(0.0);
+        double averageWeight = items.isEmpty() ? 0.0
+            : items.stream()
+            .mapToDouble(LiquidResponseDTO.LiquidPreviewDTO::getWeight)
+            .average()
+            .orElse(0.0);
 
         return LiquidConverter.toLiquidPreviewListWithAverageDTO(liquids, averageWeight);
     }
@@ -238,5 +242,32 @@ public class LiquidServiceImpl implements LiquidService {
         }
 
         return liquidHistoryRepository.findByBinIdAndMeasuredAtBetweenOrderByMeasuredAtAsc(binId, start, end);
+    }
+
+    @Override
+    public Object getLiquidHistory(Long binId, String uuid, Integer limit) {
+        Pageable pageable = PageRequest.of(0, limit != null ? limit : 1);
+        List<LiquidHistory> histories;
+
+        if (uuid != null) {
+            histories = liquidHistoryRepository.findByBinIdAndUuidOrderByMeasuredAtDesc(binId, uuid, pageable);
+        } else {
+            histories = liquidHistoryRepository.findByBinIdOrderByMeasuredAtDesc(binId, pageable);
+        }
+
+        if (limit == null) {
+            return histories.isEmpty() ? null : convertToSensorHistoryDTO(histories.get(0));
+        }
+
+        return histories.stream()
+            .map(this::convertToSensorHistoryDTO)
+            .collect(Collectors.toList());
+    }
+
+    private SensorHistoryResponseDTO convertToSensorHistoryDTO(LiquidHistory history) {
+        return SensorHistoryResponseDTO.builder()
+            .timestamp(history.getMeasuredAt())
+            .value(history.getWeight())
+            .build();
     }
 }

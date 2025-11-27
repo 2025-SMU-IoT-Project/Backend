@@ -2,7 +2,10 @@ package com.smu.iot.domain.loadcell.entity;
 
 import com.smu.iot.global.entity.BaseEntity;
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "bin_weight_history")

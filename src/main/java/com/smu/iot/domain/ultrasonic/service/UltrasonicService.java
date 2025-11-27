@@ -1,5 +1,6 @@
 package com.smu.iot.domain.ultrasonic.service;
 
+import com.smu.iot.domain.bin.dto.response.SensorHistoryResponseDTO;
 import com.smu.iot.domain.bin.entity.Bin;
 import com.smu.iot.domain.bin.repository.BinRepository;
 import com.smu.iot.domain.event.service.EventService;
@@ -149,6 +150,32 @@ public class UltrasonicService {
             .distanceCm(ultrasonic.getDistanceCm())
             .fillRate(ultrasonic.getFillRate())
             .createdAt(ultrasonic.getCreatedAt())
+            .build();
+    }
+
+    public Object getUltrasonicHistory(Long binId, String uuid, Integer limit) {
+        Pageable pageable = PageRequest.of(0, limit != null ? limit : 1);
+        List<Ultrasonic> histories;
+
+        if (uuid != null) {
+            histories = ultrasonicRepository.findByBinIdAndUuidOrderByCreatedAtDesc(binId, uuid, pageable);
+        } else {
+            histories = ultrasonicRepository.findByBinIdOrderByCreatedAtDesc(binId, pageable);
+        }
+
+        if (limit == null) {
+            return histories.isEmpty() ? null : convertToSensorHistoryDTO(histories.get(0));
+        }
+
+        return histories.stream()
+            .map(this::convertToSensorHistoryDTO)
+            .collect(Collectors.toList());
+    }
+
+    private SensorHistoryResponseDTO convertToSensorHistoryDTO(Ultrasonic history) {
+        return SensorHistoryResponseDTO.builder()
+            .timestamp(history.getCreatedAt())
+            .value(history.getFillRate())
             .build();
     }
 }
