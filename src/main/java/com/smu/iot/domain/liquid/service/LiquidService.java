@@ -29,4 +29,6 @@ public interface LiquidService {
     Object readLiquidTrendByBinId(Long binId, PeriodType period, LocalDate date, TrendMode mode);
 
     Object readLiquidTrendById(Long liquidId, PeriodType period, LocalDate date, TrendMode mode);
+
+    Object getLiquidHistory(Long binId, String uuid, Integer limit);
 }

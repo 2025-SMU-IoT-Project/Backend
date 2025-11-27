@@ -1,6 +1,7 @@
 package com.smu.iot.domain.ultrasonic.repository;
 
 import com.smu.iot.domain.ultrasonic.entity.Ultrasonic;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
@@ -16,6 +17,10 @@ public interface UltrasonicRepository extends JpaRepository<Ultrasonic, Long> {
     Optional<Ultrasonic> findFirstByBinIdOrderByCreatedAtDesc(Long binId);
 
     List<Ultrasonic> findByBinIdOrderByCreatedAtDesc(Long binId);
+
+    List<Ultrasonic> findByBinIdAndUuidOrderByCreatedAtDesc(Long binId, String uuid, Pageable pageable);
+
+    List<Ultrasonic> findByBinIdOrderByCreatedAtDesc(Long binId, Pageable pageable);
 
     List<Ultrasonic> findTop5ByBinIdAndCreatedAtBetweenOrderByCreatedAtDesc(Long binId, LocalDateTime start, LocalDateTime end);
 

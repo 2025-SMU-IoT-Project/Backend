@@ -28,6 +28,11 @@ public enum LaserSuccessCode implements BaseSuccessCode {
         HttpStatus.OK,
         "LASER2004",
         "통계 정보를 조회했습니다"
+    ),
+    PACKET_RECEIVED(
+        HttpStatus.OK,
+        "LASER2005",
+        "패킷이 정상적으로 수신되었습니다"
     );
 
     private final HttpStatus status;

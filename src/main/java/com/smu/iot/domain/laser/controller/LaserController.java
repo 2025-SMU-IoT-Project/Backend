@@ -1,7 +1,7 @@
 package com.smu.iot.domain.laser.controller;
 
 import com.smu.iot.domain.laser.code.LaserSuccessCode;
-import com.smu.iot.domain.laser.dto.request.InsertionEventRequestDTO;
+import com.smu.iot.domain.laser.dto.request.LaserPacketRequestDTO;
 import com.smu.iot.domain.laser.dto.response.EventDetailResponseDTO;
 import com.smu.iot.domain.laser.dto.response.InsertionEventResponseDTO;
 import com.smu.iot.domain.laser.dto.response.InsertionStatsResponseDTO;
@@ -25,18 +25,17 @@ public class LaserController {
     private final LaserService laserService;
 
     @PostMapping("/insertion-event")
-    @Operation(
-        summary = "컵 투입 이벤트 처리",
-        description = "STM32에서 1초간 20회 측정한 데이터를 전송받아 처리"
-    )
+    @Operation(summary = "컵 투입 이벤트 처리 (패킷 전송)", description = "STM32에서 20개씩 나누어 전송되는 패킷을 수신하고, 모아서 처리")
     public ApiResponse<InsertionEventResponseDTO> processInsertionEvent(
-        @RequestBody InsertionEventRequestDTO request) {
+        @RequestBody LaserPacketRequestDTO request) {
 
-        log.info("Received insertion event - binId: {}, samples: {}",
-            request.getBinId(),
-            request.getSamples() != null ? request.getSamples().size() : 0);
+        log.info("Received laser packet - uuid: {}, idx: {}", request.getUuid(), request.getIdx());
 
-        InsertionEventResponseDTO response = laserService.processInsertionEvent(request);
+        InsertionEventResponseDTO response = laserService.processPacket(request);
+
+        if (response == null) {
+            return ApiResponse.onSuccess(LaserSuccessCode.PACKET_RECEIVED, null);
+        }
 
         // 유효한 컵 vs 거부된 컵에 따라 다른 SuccessCode 사용
         LaserSuccessCode successCode = response.getIsValidCup()
@@ -47,10 +46,7 @@ public class LaserController {
     }
 
     @GetMapping("/event/{eventId}")
-    @Operation(
-        summary = "특정 이벤트 상세 조회",
-        description = "응답에 20개 측정값이 모두 포함됨"
-    )
+    @Operation(summary = "특정 이벤트 상세 조회", description = "응답에 측정값이 모두 포함됨")
     public ApiResponse<EventDetailResponseDTO> getEventDetail(@PathVariable Long eventId) {
         log.info("Querying event detail - eventId: {}", eventId);
 
@@ -59,10 +55,7 @@ public class LaserController {
     }
 
     @GetMapping("/stats")
-    @Operation(
-        summary = "투입 이벤트 통계 조회",
-        description = "전체/유효/거부 개수, 패턴별 통계, 최근 10개 이벤트 포함"
-    )
+    @Operation(summary = "투입 이벤트 통계 조회", description = "전체/유효/거부 개수, 패턴별 통계, 최근 10개 이벤트 포함")
     public ApiResponse<InsertionStatsResponseDTO> getInsertionStats(
         @RequestParam(defaultValue = "1") Long binId) {
 

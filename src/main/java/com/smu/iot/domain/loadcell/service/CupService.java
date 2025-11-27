@@ -1,5 +1,6 @@
 package com.smu.iot.domain.loadcell.service;
 
+import com.smu.iot.domain.bin.dto.response.SensorHistoryResponseDTO;
 import com.smu.iot.domain.bin.entity.Bin;
 import com.smu.iot.domain.bin.repository.BinRepository;
 import com.smu.iot.domain.event.service.EventService;
@@ -20,6 +21,8 @@ import com.smu.iot.domain.loadcell.repository.CupRepository;
 import com.smu.iot.global.apipayload.exception.GeneralException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -322,6 +325,32 @@ public class CupService {
             .addedWeight(history.getAddedWeight())
             .uuid(history.getUuid())
             .timestamp(history.getCreatedAt())
+            .build();
+    }
+
+    public Object getBinWeightHistory(Long binId, String uuid, Integer limit) {
+        Pageable pageable = PageRequest.of(0, limit != null ? limit : 1);
+        List<BinWeightHistory> histories;
+
+        if (uuid != null) {
+            histories = binWeightHistoryRepository.findByBinIdAndUuidOrderByCreatedAtDesc(binId, uuid, pageable);
+        } else {
+            histories = binWeightHistoryRepository.findByBinIdOrderByCreatedAtDesc(binId, pageable);
+        }
+
+        if (limit == null) {
+            return histories.isEmpty() ? null : convertToSensorHistoryDTO(histories.get(0));
+        }
+
+        return histories.stream()
+            .map(this::convertToSensorHistoryDTO)
+            .collect(Collectors.toList());
+    }
+
+    private SensorHistoryResponseDTO convertToSensorHistoryDTO(BinWeightHistory history) {
+        return SensorHistoryResponseDTO.builder()
+            .timestamp(history.getCreatedAt())
+            .value(history.getCurrentWeight())
             .build();
     }
 }
