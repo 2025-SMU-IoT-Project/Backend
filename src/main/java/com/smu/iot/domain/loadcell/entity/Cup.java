@@ -51,10 +51,10 @@ public class Cup extends BaseEntity {
 
     @Getter
     public enum CupWeightType {
-        EMPTY_CUP("빈 컵", 4.0, 7.0),
-        LIGHT_LIQUID("약간의 액체", 20.0, 100.0),
-        MEDIUM_LIQUID("중간 액체", 100.0, 200.0),
-        HEAVY_LIQUID("많은 액체", 200.0, 350.0),
+        EMPTY_CUP("빈 컵", 10.0, 15.0),
+        LIGHT_LIQUID("약간의 액체", 15.0, 275.0),
+        MEDIUM_LIQUID("중간 액체", 275.0, 450.0),
+        HEAVY_LIQUID("많은 액체", 450.0, 535.0),
         ABNORMAL("비정상 무게", 0.0, 0.0);
 
         private final String description;
