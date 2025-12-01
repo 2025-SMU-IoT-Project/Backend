@@ -35,10 +35,10 @@ public class LaserService {
 
     // 거리 기반 판단 상수 (mm)
     private static final int MOVING_AVERAGE_WINDOW = 5; // 이동 평균 윈도우 크기
-    private static final double DETECT_THRESHOLD_MM = 480.0; // 물체 감지 임계값 (이보다 작으면 물체), 쓰리기통 너비 - 10 정도
+    private static final double DETECT_THRESHOLD_MM = 450.0; // 물체 감지 임계값 (이보다 작으면 물체), 쓰리기통 너비 - 10 정도
     private static final double CUP_MIN_DIST_MM = 120.0; // 컵 유효 거리 최소값, 310 정도?
     private static final double CUP_MAX_DIST_MM = 480.0; // 컵 유효 거리 최대값, DETECT_THRESHOLD_MM와 동일하게
-    private static final double MIN_VALID_DIAMETER = 30.0; // 유효 지름 최소값 (이보다 작으면 null 처리)
+    private static final double MIN_VALID_DIAMETER = 20.0; // 유효 지름 최소값 (이보다 작으면 null 처리) 20
     private static final double CONSTANT_THRESHOLD = 20.0; // 일정 패턴 임계값 (mm)
 
     // 메인 처리 로직: STM32에서 받은 투입 이벤트 데이터 처리
@@ -55,7 +55,7 @@ public class LaserService {
 
         // 2. 전체 패킷 수신 여부 확인 (총 50개)
         long count = rawDataRepository.countByUuid(request.getUuid());
-        if (count < 50) {
+        if (count < 26) { // 50
             return null; // 아직 다 안 모임
         }
 
@@ -122,11 +122,16 @@ public class LaserService {
 
             // 3. 지름 계산
             List<Double> diameters = calculateDiameters(request.getBinWidthMm(), smoothedDistances);
+            log.info("BinWidth: {}, Distances(0): {}, Diameter(0): {}",
+                request.getBinWidthMm(),
+                smoothedDistances.isEmpty() ? "empty" : smoothedDistances.get(0),
+                diameters.isEmpty() ? "empty" : diameters.get(0));
 
             // 4. 패턴 분석
             PatternAnalysisResult analysisResult = analyzeCupPattern(smoothedDistances, diameters);
-            log.info("Pattern analysis: type={}, valid={}",
-                analysisResult.getPatternType(), analysisResult.isValid());
+            log.info("Pattern analysis: type={}, valid={}, minDia={}, maxDia={}",
+                analysisResult.getPatternType(), analysisResult.isValid(),
+                analysisResult.getMinDiameter(), analysisResult.getMaxDiameter());
 
             // 4. 이벤트 엔티티 생성
             CupShape event = createInsertionEvent(request, analysisResult);
@@ -299,9 +304,9 @@ public class LaserService {
             result.setPatternType(PatternType.NORMAL);
             result.setValid(true);
         } else {
-            result.setPatternType(PatternType.ABNORMAL);
+            result.setPatternType(PatternType.IRREGULAR);
             result.setValid(false);
-            result.setRejectionReason("컵이 뒤집혀서 투입되었습니다.");
+            result.setRejectionReason("비정상 물체 탐지");
         }
 
         return result;
@@ -420,9 +425,9 @@ public class LaserService {
         private PatternType patternType;
         private boolean valid;
         private String rejectionReason;
-        private double minDiameter;
-        private double maxDiameter;
-        private double diameterChange;
+        private Double minDiameter;
+        private Double maxDiameter;
+        private Double diameterChange;
     }
 
     private EventDetailResponseDTO mapToEventDetailDTO(CupShape event) {
