@@ -90,7 +90,7 @@ public class CupService {
         Double previousWeight = binWeight.getCurrentWeight();
         Double cupWeight = currentBinWeight - previousWeight;
 
-        if (cupWeight <= 0) {
+        if (cupWeight < 0) {
             log.warn("Invalid cup weight detected - binId: {}, cupWeight: {}g (current: {}g, previous: {}g)",
                 binId, cupWeight, currentBinWeight, previousWeight);
             throw new GeneralException(CupErrorCode.INVALID_WEIGHT);
